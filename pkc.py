@@ -1,23 +1,21 @@
 #!/usr/bin/env python
 
-import math, cutils, argparse
-import string
-import sys, os
+import math, cutils, argparse, string, sys, os
 
-
-
-CHARSET = string.ascii_letters+string.digits+"@#$%^&*()<>,.?:;[]/!\\\`\'\""+string.whitespace
+CHARSET = string.ascii_letters+string.digits+"@#$%^&*()<>-=,.?:;[]/!\\\`\'\""+string.whitespace
 
 def main():
     namespace = parse()
-    block = BlockInteger()
+    block_cont = blockContainer()
     if(namespace.in_stream or (namespace.in_stream and namespace.out_path)):
         f_cont = get_content(namespace.in_stream)
-        block = BlockInteger(f_cont).get_block
-        print(block)
-    elif(namespace.str_stream):
-        block_integer = block.get_block(namespace.str_stream)
+        block_integer = block_cont.get_block(f_cont)
         print(block_integer)
+
+    elif(namespace.str_stream):
+        block_integer = block_cont.get_block(namespace.str_stream)
+        print(block_integer)
+
 
 
 def parse():
@@ -39,13 +37,13 @@ def parse():
     namespace = parser.parse_args()
     return namespace
 
-def get_content(in_path):
-    stream_open = open(in_path,"r")
+def get_content(path):
+    stream_open = open(path,"r")
     stream_cont = stream_open.read()
     stream_open.close()
     return stream_cont
 
-class BlockInteger:
+class blockContainer:
 
     def __init__(self, stream=None, block_integer=0, raw_block_integer=0, exp=0, str_block_integer=None):
         self.stream = stream
@@ -54,7 +52,7 @@ class BlockInteger:
         self.str_block_integer = str_block_integer
         self.exp = exp
 
-    def __repr__(self):
+    def __str__(self):
         return self.block_integer
 
     def get_block(self, stream):
@@ -66,10 +64,6 @@ class BlockInteger:
         self.block_integer = [self.str_block_integer[i:i+len(CHARSET)] for i in range(0,len(self.str_block_integer),len(CHARSET))]
         return self.block_integer
 
-#class keyGen:
-#    def __init__(self, p, q):
-#        self.p = p
-#        self.q = q
 
 if __name__ == '__main__':
     main()   
