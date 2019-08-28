@@ -58,10 +58,12 @@ def isPrime(n):
 
 # generate primenumber with specified size
 def genPrime(s=1024):
+    i=1
     while True:
         # generate random number in range of 2^keysize -1 and 2^keysize
         n = random.randrange(2**(s-1),2**(s))
         if isPrime(n):
+            i+=1
             return n
 
 # return true if n is prime using trial division algorithm
