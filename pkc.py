@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import math, cutils, argparse, string, sys, os
+import math, cryutils, argparse, string, sys, os
 
 CHARSET = string.ascii_letters+string.digits+"@#$%^&*()<>-=,.?:;[]/!\\\`\'\""+string.whitespace
 

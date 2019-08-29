@@ -6,27 +6,14 @@
 # d = e mod inv 
 import cryutils, math, random
 
-def main():
-    cont = KeyContainer()
-    p = cont.p
-    q = cont.q
-    e = cont._comp_e(1024)
-    print("{} / {} / {}".format(p,q,e))
-    print(" ")
-    print("Lenght of p: {}".format(len(str(p))))
-    print("Lenght of q: {}".format(len(str(q))))
-    print("Lenght of e: {}".format(len(str(e))))
-
-
-
-class KeyContainer:
+class _ComputeKey:
 
     def __init__(
-        self,
-        public_key=0, 
-        private_key=0, 
-        keysize=1024,
-        n=0,e=0,d=0,p=0,q=0):
+            self,
+            public_key=0, 
+            private_key=0, 
+            keysize=1024,
+            n=0,e=0,d=0,p=0,q=0):
 
         self.public_key = public_key
         self.private_key = private_key
@@ -42,12 +29,28 @@ class KeyContainer:
         return self.n
     
     def _comp_e(self, keysize):
-        self.x = (self.p - 1) * (self.q - 1)        
-        self.e = random.randrange((self.p - 1),(self.q - 1))
-        return self.e
-        
-        
+        self.x = (self.p - 1) * (self.q - 1)
+        print(" " + str(self.x) + " ")
+        if (self.p > self.q): 
+            while True:      
+                self.e = random.randrange(self.q, self.p)
+                if(math.gcd(self.e,self.x)==1):
+                    break
+            return self.e
+        else:
+            while True:
+                self.e = random.randrange(self.p, self.q)
+                if(math.gcd(self.e,self.x)==1):
+                    break
+            return self.e
+    
+    def _comp_d(self, d, e, p, q):
+        self.d = cryutils.modInverse(self.e, (self.p - 1) * (self.q - 1))
+        return self.d
 
-if __name__ == "__main__":
-    main()
+class KeyContainer(_ComputeKey):
+    
+    def generate():
+        k = _ComputeKey()
+        
 
