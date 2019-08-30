@@ -1,10 +1,14 @@
-# public key = n e
-# private key = n d
-# gen prime p q
-# n = p x q 
-# e = e rel prime (p - 1) x (q - 1)
-# d = e mod inv 
+# Key generator module for the Public Key Cipher
+#
+# Create KeyContainer object and generate public and private keys
+# Relies on cryutils.py module
+# by Jared @ github.com/disastrpc
+
 import cryutils, math, random
+
+# _KeyGenerator parent class handles random number generation and computation of n e and d
+# _comp methods are called by the KeyContainer child class using the generate() method
+# All _comp methods should be considered implementation
 
 class _KeyGenerator:
 
@@ -14,59 +18,66 @@ class _KeyGenerator:
             n=0,e=0,d=0,p=0,q=0):
 
         self.keysize = keysize
+        self.p = cryutils.genPrime(self.keysize)
+        self.q = cryutils.genPrime(self.keysize)
         self.n = n
         self.e = e
         self.d = d
-        self.p = cryutils.genPrime(self.keysize)
-        self.q = cryutils.genPrime(self.keysize)
     
+    # compute n using equation n = p * q
     def _comp_n(self, p, q):
         self.n = self.p * self.q
         return self.n
     
-    def _comp_e(self, p, q):
+    # Compute e. 
+    # e must be relatively prime to x which is calculated using
+    # the equation x = (p - 1) * (q - 1)
+    def _comp_e(self, p, q, keysize):
         self.x = (self.p - 1) * (self.q - 1)
-        if (self.p > self.q): 
-            while True:      
-                self.e = random.randrange(self.q, self.p) # ?
-                if(math.gcd(self.e,self.x)==1):
-                    break
-            return self.e
-        else:
-            while True:
-                self.e = random.randrange(self.p, self.q) # ?
-                if(math.gcd(self.e,self.x)==1):
-                    break
-            return self.e
-    
+        while True:  
+            # while true try number    
+            self.e = random.randrange(2 ** (self.keysize - 1), 2 ** (self.keysize))
+            # Check numbers are relative primes
+            if(math.gcd(self.e,self.x)==1):
+                break
+        return self.e
+
+    # Compute d
+    # Parameters for the modInverse(a, m) func must be relatively prime.
     def _comp_d(self, e, p, q):
         self.d = cryutils.modInverse(self.e, (self.p - 1) * (self.q - 1))
         return self.d
 
+
+# KeyContainer child class
+# KeyContainer generates and formats private and public keys for display and storage
 class KeyContainer(_KeyGenerator):
     
     def __init__(self, private_key=0, public_key=0):
         self.private_key = private_key
         self.public_key = public_key
-    
+
+    # Create KeyGenerator instance and assign keys to instance of KeyContainer object
     def generate(self):
         self.gen = _KeyGenerator()
         self.n = self.gen._comp_n(self.gen.p, self.gen.q)
-        self.e = self.gen._comp_e(self.gen.p, self.gen.q)
+        self.e = self.gen._comp_e(self.gen.p, self.gen.q, self.gen.keysize)
         self.d = self.gen._comp_d(self.e, self.gen.p, self.gen.q)
         return self.n, self.e, self.d
+    
+    def print_key(self):
+        print("Public key: "+str(self.n)+", "+str(self.e))
+        print("Private key: "+str(self.n)+", "+str(self.d))
+        print("Public key len: 1- {} 2- {}".format(len(str(self.n)), len(str(self.e))))
+        print("Private key len: 1- {} 2- {}".format(len(str(self.n)), len(str(self.d))))
 
 def main():
-    keygen = _KeyGenerator()
-    n = keygen._comp_n(keygen.p, keygen.q)
-    print(n)
-    e = keygen._comp_e(keygen.p, keygen.q)
-    print(e)
-    d = keygen._comp_d(e, keygen.p, keygen.q)
-    print(d)
+    kc = KeyContainer()
+    kc.generate()
 
 if __name__ == "__main__":
     main()
+
         
 
         

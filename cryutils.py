@@ -79,6 +79,7 @@ def trialDiv(n):
     return True
 
 # mod inverse Python implementation by Al Sweigart
+# using the extended Eucledian algorithm
 def modInverse(a, m):
     if math.gcd(a, m) != 1:
         return None
