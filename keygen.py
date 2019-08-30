@@ -8,7 +8,7 @@ import cryutils, math, random
 
 # _KeyGenerator parent class handles random number generation and computation of n e and d
 # _comp methods are called by the KeyContainer child class using the generate() method
-# All _comp methods should be considered implementation
+# All _comp methods should be considered implementation details.
 
 class _KeyGenerator:
 
@@ -53,9 +53,10 @@ class _KeyGenerator:
 # KeyContainer generates and formats private and public keys for display and storage
 class KeyContainer(_KeyGenerator):
     
-    def __init__(self, private_key=0, public_key=0):
+    def __init__(self, private_key=0, public_key=0, keysize):
         self.private_key = private_key
         self.public_key = public_key
+        self.keysize = keysize
 
     # Create KeyGenerator instance and assign keys to instance of KeyContainer object
     def generate(self):

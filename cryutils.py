@@ -1,6 +1,8 @@
+# This module contains math functions to assist in key generation
+
 import math, random
 
-# calculate sieve and return list of primes
+# calculate a sieve of primes and return list
 def primeSieve(sieveSize):
     sieve = [True] * sieveSize
     sieve[0] = False
@@ -58,7 +60,7 @@ def isPrime(n):
 
 # generate primenumber with specified size
 # generated number will be s bits in size
-def genPrime(s=1024):
+def genPrime(s):
     while True:
         # generate random number in range of 2^keysize -1 and 2^keysize
         n = random.randrange(2**(s-1), 2**(s))
