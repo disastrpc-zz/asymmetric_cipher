@@ -1,19 +1,18 @@
 #!/usr/bin/env python
 
 import math, cryutils, argparse, string, sys, os
-
-CHARSET = string.ascii_letters+string.digits+"@#$%^&*()<>-=,.?:;[]/!\\\`\'\""+string.whitespace
+from encrypter import BlockAssembler
 
 def main():
     namespace = parse()
-    block_cont = BlockContainer()
-    if(namespace.file_path or (namespace.file_path and namespace.file_path)):
+    block_cont = BlockAssembler()
+    if(namespace.in_path or (namespace.in_path and namespace.out_path)):
         f_cont = get_content(namespace.in_stream)
-        block_integer = block_cont.get_block(f_cont)
+        block_integer = block_cont.assemble_block(f_cont)
         print(block_integer)
 
     elif(namespace.string):
-        block_integer = block_cont.get_block(namespace.string)
+        block_integer = block_cont.assemble_block(namespace.string)
         print(block_integer)
 
 def parse():
@@ -21,7 +20,7 @@ def parse():
     grp_1 = parser.add_mutually_exclusive_group()
     grp_2 = parser.add_mutually_exclusive_group()
 
-    grp_1.add_argument('-f','--file',dest='file_path',
+    grp_1.add_argument('-f','--file',dest='in_path',
                     help='Provide input file path')
     grp_1.add_argument('-s','--string',dest='string',
                     help='Provide a string')
@@ -39,28 +38,6 @@ def get_content(path):
     stream_cont = stream_open.read()
     stream_open.close()
     return stream_cont
-
-class BlockContainer:
-
-    def __init__(self, stream=None, block_integer=0, raw_block_integer=0, exp=0, str_block_integer=None):
-        self.stream = stream
-        self.block_integer = block_integer
-        self.raw_block_integer = raw_block_integer
-        self.str_block_integer = str_block_integer
-        self.exp = exp
-
-    def __str__(self):
-        return self.block_integer
-
-    def get_block(self, stream):
-        self.raw_block_integer = 0
-        for i in stream:
-            self.raw_block_integer += CHARSET.index(i) * (pow(len(CHARSET),self.exp))
-            self.exp+=1
-        self.str_block_integer = str(self.raw_block_integer)
-        self.block_integer = [self.str_block_integer[i:i+len(CHARSET)] for i in range(0,len(self.str_block_integer),len(CHARSET))]
-        return self.block_integer
-
 
 if __name__ == '__main__':
     main()   
