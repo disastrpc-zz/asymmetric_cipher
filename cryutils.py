@@ -60,6 +60,7 @@ def isPrime(n):
 
 # generate primenumber with specified size
 # generated number will be s bits in size
+# s must be supplied
 def genPrime(s):
     while True:
         # generate random number in range of 2^keysize -1 and 2^keysize
