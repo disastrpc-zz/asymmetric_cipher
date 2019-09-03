@@ -25,14 +25,14 @@ class _KeyGenerator:
         self.d = d
     
     # compute n using equation n = p * q
-    def _comp_n(self, p, q):
+    def _comp_n(self):
         self.n = self.p * self.q
         return self.n
     
     # Compute e
     # e must be relatively prime to x which is calculated using
     # the equation x = (p - 1) * (q - 1)
-    def _comp_e(self, p, q, keysize):
+    def _comp_e(self):
         self.x = (self.p - 1) * (self.q - 1)
         while True:  
             # while true try number    
@@ -44,7 +44,7 @@ class _KeyGenerator:
 
     # Compute d
     # Parameters for the modInverse(a, m) func must be relatively prime.
-    def _comp_d(self, e, p, q):
+    def _comp_d(self):
         self.d = cryutils.modInverse(self.e, (self.p - 1) * (self.q - 1))
         return self.d
 
@@ -53,7 +53,7 @@ class _KeyGenerator:
 # KeyContainer generates and formats private and public keys for display and storage
 class KeyContainer(_KeyGenerator):
     
-    def __init__(self, keysize, private_key=0, public_key=0):
+    def __init__(self, keysize=1024, private_key=0, public_key=0):
         self.keysize = keysize
         self.private_key = private_key
         self.public_key = public_key
@@ -61,14 +61,14 @@ class KeyContainer(_KeyGenerator):
     # Create KeyGenerator instance and assign keys to instance of KeyContainer object
     def generate(self):
         self.gen = _KeyGenerator(self.keysize)
-        self.n = self.gen._comp_n(self.gen.p, self.gen.q)
-        self.e = self.gen._comp_e(self.gen.p, self.gen.q, self.keysize)
-        self.d = self.gen._comp_d(self.e, self.gen.p, self.gen.q)
+        self.n = self.gen._comp_n()
+        self.e = self.gen._comp_e()
+        self.d = self.gen._comp_d()
         return self.n, self.e, self.d
     
     def print_key(self):
-        print("Public key: "+str(self.n)+", "+str(self.e))
-        print("Private key: "+str(self.n)+", "+str(self.d))
+        print("Public key: "+str(self.n)+str(self.e))
+        print("Private key: "+str(self.n)+str(self.d))
         print("Public key len: n {} e {}".format(len(str(self.n)), len(str(self.e))))
         print("Private key len: n {} d {}".format(len(str(self.n)), len(str(self.d))))
 
