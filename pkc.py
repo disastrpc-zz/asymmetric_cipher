@@ -1,26 +1,21 @@
 #!/usr/bin/env python
 
-import math, cryutils, argparse, string, sys, os
+import cryutils, argparse, string, sys, os
+from time import perf_counter as prog
 from keygen import KeyContainer
 
 def parse():
     parser = argparse.ArgumentParser(prog='pkciph')
-    arg_1 = parser.add_mutually_exclusive_group()
-    arg_2 = parser.add_mutually_exclusive_group()
-    out = parser.add_mutually_exclusive_group()
+    keygen_group = parser.add_mutually_exclusive_group()
+    # arg_2 = parser.add_mutually_exclusive_group()
+    # out = parser.add_mutually_exclusive_group()
 
-    arg_1.add_argument('-f','--file',help='Provide input file path',
-                    metavar='<path>')
-    arg_1.add_argument('-t','--text',dest='string',
-                    help='Provide a string',metavar='<string>')
-    arg_1.add_argument('-k','--key',dest='keysize',
-                    help='Generate key',type=int,metavar='<keysize>')
-    arg_2.add_argument('-e','--encrypt',action='store_true',
-                    dest='encrypt',help='Start in encrypt mode')
-    arg_2.add_argument('-d','--decrypt',action='store_true',
-                    help='Start in decrypt mode')  
-    out.add_argument('-o','--output',dest='out',metavar='<output>',
-                    help='Output file path')
+
+    parser.add_argument('mode',nargs='?')
+    keygen_group.add_argument('-l','--lenght',help='Specify key lenght, default is 1024^2 bits',
+                    metavar='key size',default=1024,type=int,dest='keysize')
+    keygen_group.add_argument('-o','--output',dest='path',
+                    help='Output path, default is current directory',metavar='output')
     namespace = parser.parse_args()
     return namespace
 
@@ -37,11 +32,14 @@ def output(path):
 
 def main():
     namespace = parse()
-    if namespace.keysize:
+    if namespace.mode == 'keygen':
         key_container = KeyContainer(namespace.keysize)
+        print("Generating private and public keys with size {}^2 bits...".format(namespace.keysize))
+        t_start = prog()
         key_container.generate()
+        t_stop = prog()
         key_container.print_key()
-    # elif namespace.keysize and namespace.out:
+        print("Operation successful. Elapsed time {} seconds.".format(int(t_stop - t_start)))
 
 
 if __name__ == '__main__':

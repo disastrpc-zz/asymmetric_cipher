@@ -53,7 +53,7 @@ class _KeyGenerator:
 # KeyContainer generates and formats private and public keys for display and storage
 class KeyContainer(_KeyGenerator):
     
-    def __init__(self, keysize=1024, private_key=0, public_key=0):
+    def __init__(self, keysize, private_key=0, public_key=0):
         self.keysize = keysize
         self.private_key = private_key
         self.public_key = public_key
