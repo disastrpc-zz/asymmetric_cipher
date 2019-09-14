@@ -38,15 +38,22 @@ class _KeyGenerator:
             # while true try number    
             self.e = random.randrange(2 ** (self.keysize - 1), 2 ** (self.keysize))
             # Check numbers are relative primes
-            if(math.gcd(self.e,self.x)==1):
-                break
-        return self.e
+            if(math.gcd(self.e,(self.p - 1) * (self.q - 1))==1):
+                return self.e
 
     # Compute d
     # Parameters for the modInverse(a, m) func must be relatively prime.
     def _comp_d(self):
         self.d = cryutils.modInverse(self.e, (self.p - 1) * (self.q - 1))
         return self.d
+
+    # Create KeyGenerator instance and assign keys to instance of KeyContainer object 
+    def generate(self):
+        self.gen = _KeyGenerator(self.keysize)
+        self.n = self.gen._comp_n()
+        self.e = self.gen._comp_e()
+        self.d = self.gen._comp_d()
+        return self.n, self.e, self.d
 
 
 # KeyContainer child class
@@ -57,14 +64,6 @@ class KeyContainer(_KeyGenerator):
         self.keysize = keysize
         self.private_key = private_key
         self.public_key = public_key
-
-    # Create KeyGenerator instance and assign keys to instance of KeyContainer object
-    def generate(self):
-        self.gen = _KeyGenerator(self.keysize)
-        self.n = self.gen._comp_n()
-        self.e = self.gen._comp_e()
-        self.d = self.gen._comp_d()
-        return self.n, self.e, self.d
     
     def print_key(self):
         print("Public key: "+str(self.n)+str(self.e))
