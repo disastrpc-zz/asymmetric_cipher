@@ -4,7 +4,7 @@
 # Relies on cryutils.py module
 # by Jared @ github.com/disastrpc
 
-import cryutils, math, random
+import cryutils, math, random, os.path
 
 # _KeyGenerator parent class handles random number generation and computation of n e and d
 # _comp methods are called by the KeyContainer child class using the generate() method
@@ -47,7 +47,7 @@ class _KeyGenerator:
         self.d = cryutils.modInverse(self.e, (self.p - 1) * (self.q - 1))
         return self.d
 
-    # Create KeyGenerator instance and assign keys to instance of KeyContainer object 
+    # Create KeyGenerator instance and assign keys to instance of object
     def generate(self):
         self.gen = _KeyGenerator(self.keysize)
         self.n = self.gen._comp_n()
@@ -71,10 +71,17 @@ class KeyContainer(_KeyGenerator):
         print("Public key len: n {} e {}".format(len(str(self.n)), len(str(self.e))))
         print("Private key len: n {} d {}".format(len(str(self.n)), len(str(self.d))))
 
+    def output_keys(self):
+        try:
+            with open('public_key.txt','x') as self.public_key_file:
+                self.public_key = str(self.n)+str(self.e)
+                self.public_key_file.write(self.public_key)
+            with open('private_key.txt','x') as self.private_key_file:
+                self.private_key = str(self.n)+str(self.d)
+                self.private_key_file.write(self.private_key)
+        except:
+            print("File already exists")
+            
 
-        
 
-        
-
-        
-
+            
