@@ -4,7 +4,9 @@
 # Relies on cryutils.py module
 # by Jared @ github.com/disastrpc
 
-import cryutils, math, random, os.path
+import cryutils, math, os.path
+from random import randrange
+from sys import platform
 
 # _KeyGenerator parent class handles random number generation and computation of n e and d
 # _comp methods are called by the KeyContainer child class using the generate() method
@@ -30,13 +32,13 @@ class _KeyGenerator:
         return self.n
     
     # Compute e
-    # e must be relatively prime to x which is calculated using
-    # the equation x = (p - 1) * (q - 1)
+    # e must be relatively prime to p*q which is calculated using
+    # the equation e = (p - 1) * (q - 1)
     def _comp_e(self):
-        self.x = (self.p - 1) * (self.q - 1)
+
         while True:  
             # while true try number    
-            self.e = random.randrange(2 ** (self.keysize - 1), 2 ** (self.keysize))
+            self.e = randrange(2 ** (self.keysize - 1), 2 ** (self.keysize))
             # Check numbers are relative primes
             if(math.gcd(self.e,(self.p - 1) * (self.q - 1))==1):
                 return self.e
@@ -60,28 +62,45 @@ class _KeyGenerator:
 # KeyContainer generates and formats private and public keys for display and storage
 class KeyContainer(_KeyGenerator):
     
-    def __init__(self, keysize, private_key=0, public_key=0):
+    def __init__(self, keysize, priv_key=0, pub_key=0):
         self.keysize = keysize
-        self.private_key = private_key
-        self.public_key = public_key
+        self.priv_key = priv_key
+        self.pub_key = pub_key
     
-    def print_key(self):
-        print("Public key: "+str(self.n)+str(self.e))
-        print("Private key: "+str(self.n)+str(self.d))
-        print("Public key len: n {} e {}".format(len(str(self.n)), len(str(self.e))))
-        print("Private key len: n {} d {}".format(len(str(self.n)), len(str(self.d))))
+    def __repr__(self):
+        return [(self.keysize,self.priv_key,self.pub_key)]
+    
+    def __str__(self):
+        return "Public key: "+str(self.n)+str(self.e)+'\n'+"Private key: "+str(self.n)+str(self.d)
 
-    def output_keys(self):
-        try:
-            with open('public_key.txt','x') as self.public_key_file:
-                self.public_key = str(self.n)+str(self.e)
-                self.public_key_file.write(self.public_key)
-            with open('private_key.txt','x') as self.private_key_file:
-                self.private_key = str(self.n)+str(self.d)
-                self.private_key_file.write(self.private_key)
-        except:
-            print("File already exists")
-            
+    def to_file(self, path, overwrite=False):
+        if platform.startswith('linux'):
+            pub_system_path = os.path.join(path,'pk_pub.dat')
+            priv_system_path = os.path.join(path,'pk_priv.dat')
+        elif platform.startswith('win32') or platform.startswith('cygwin'):
+            print('not implemented')
+            pass
+
+        if not overwrite:
+            with open(pub_system_path,'x') as self.pub_key_file:
+                self.pub_key = str(self.n)+str(self.e)
+                self.pub_key_file.write(self.pub_key)
+            with open(priv_system_path,'x') as self.priv_key_file:
+                self.priv_key = str(self.n)+str(self.d)
+                self.priv_key_file.write(self.priv_key)
+        elif overwrite:
+            with open(pub_system_path,'w') as self.pub_key_file:
+                self.pub_key = str(self.n)+str(self.e)
+                self.pub_key_file.write(self.pub_key)
+            with open(priv_system_path,'w') as self.priv_key_file:
+                self.priv_key = str(self.n)+str(self.d)
+                self.priv_key_file.write(self.priv_key)
+        else:
+            raise("[ERROR] I/O error, please check path")
 
 
+
+
+     
+    
             
