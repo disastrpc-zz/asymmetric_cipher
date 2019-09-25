@@ -43,12 +43,16 @@ class Helper(_KeyGenerator):
 
     @staticmethod
     def success_timed(t_start, t_stop):
-        return("[LOG] Operation successful. Elapsed time ~{} seconds.".format(int(t_stop - t_start)))
+        stdout.write("[LOG] Operation successful. Elapsed time ~{} seconds.".format(int(t_stop - t_start))+'\n')
 
     @staticmethod
     def metrics(pub_key, priv_key):
-        stdout.write('[LOG] Public key is size {} \n'.format(bit_lenght(pub_key)))
-        stdout.write('[LOG] Private key is size '+bit_lenght(priv_key)+'\n')
+        stdout.write('[LOG] Public key is size {} \n'.format(pub_key))
+        stdout.write('[LOG] Private key is size {} \n'.format(priv_key))
+        
+    @staticmethod
+    def generate(keysize):
+        stdout.write("[INFO] Generating private and public keys with size {} bits for p and q...".format(keysize)+'\n')
 
     @staticmethod
     def animate():
@@ -61,7 +65,6 @@ class Helper(_KeyGenerator):
             sleep(0.1)
         stdout.write('\rDone!     ')
 
-    @staticmethod
-    def bit_lenght(a):
-        s = bin(a).lstrip('-0b')
-        return str(len(s))
+def bit_lenght(a):
+    s = bin(a).lstrip('-0b')
+    return str(len(s))

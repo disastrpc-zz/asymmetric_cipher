@@ -2,6 +2,7 @@
 
 import cryutils, argparse, string, sys, os
 from time import perf_counter as prog
+from encrypter import _BlockAssembler
 from helper import Helper
 from keygen import KeyContainer
 from logging import log
@@ -10,48 +11,49 @@ from threading import Thread
 def parse():
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument('-h','--help',dest='help',action='store_true')
-    
-    encrypter_group = parser.add_mutually_exclusive_group()
 
+    # mode arg
     parser.add_argument('mode',nargs='*')
 
     # gen mode
     parser.add_argument('-l','--lenght',default=1024,type=int,dest='keysize')
-    parser.add_argument('-o','--output',dest='key_output')
+    parser.add_argument('-o','--output',dest='output')
     parser.add_argument('--force',action='store_true',dest='force')
     parser.add_argument('--print',action='store_true',dest='print')
 
-    encrypter_group.add_argument('-f','--file',dest='e_path')
+    # en/de mode
+    parser.add_argument('-f','--file',dest='input')
+    parser.add_argument('--privatekey',dest='priv_key')
+    parser.add_argument('--publickey',dest='pub_key')
     namespace = parser.parse_args()
     return namespace
 
-def get_file_content(path):
-    stream_open = open(path,"r")
-    stream_cont = stream_open.read()
-    stream_open.close()
-    return stream_cont
-
 def main():
     namespace = parse()
+    assembler = _BlockAssembler()
     if namespace.help:
         Helper.show_help()
     elif 'gen' in namespace.mode:
         key_container = KeyContainer(namespace.keysize)
-        sys.stdout.write("Generating private and public keys with size {} bits for p and q...".format(namespace.keysize)+'\n')
+        Helper.generate(namespace.keysize)
         t_start = prog()
         key_container.generate()
         t_stop = prog()
         if namespace.force:
-            key_container.to_file(namespace.key_output, overwrite=True)
+            key_container.to_file(namespace.output, overwrite=True)
             Helper.success_timed(t_start, t_stop)
-        elif namespace.print:
+        elif namespace.print:            
             sys.stdout.write(key_container.__str__()+'\n')
             Helper.success_timed(t_start, t_stop)
         else:
-            key_container.to_file(namespace.key_output)
+            key_container.to_file(namespace.output)
             Helper.success_timed(t_start, t_stop)
     elif 'en' in namespace.mode:
-        sys.stdout.write("encrypting now")
+        with open(namespace.input,'r') as f:
+            raw_data = f.read()
+            print(assembler._get_block_len())
+
+
 
 if __name__ == '__main__':
     main()   

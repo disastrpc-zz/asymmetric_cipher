@@ -57,8 +57,6 @@ class _KeyGenerator:
         self.d = self.gen._comp_d()
         return self.n, self.e, self.d
 
-
-# KeyContainer child class
 # KeyContainer generates and formats private and public keys for display and storage
 class KeyContainer(_KeyGenerator):
     
@@ -73,34 +71,27 @@ class KeyContainer(_KeyGenerator):
     def __str__(self):
         return "Public key: "+str(self.n)+str(self.e)+'\n'+"Private key: "+str(self.n)+str(self.d)
 
+    def __len__(self, *args):
+        for arg in args:
+            return len(str(arg))
+
     def to_file(self, path, overwrite=False):
         if platform.startswith('linux'):
             pub_system_path = os.path.join(path,'pk_pub.dat')
             priv_system_path = os.path.join(path,'pk_priv.dat')
-        elif platform.startswith('win32') or platform.startswith('cygwin'):
+        elif platform.startswith('win32'):
             print('not implemented')
             pass
 
         if not overwrite:
-            with open(pub_system_path,'x') as self.pub_key_file:
-                self.pub_key = str(self.n)+str(self.e)
-                self.pub_key_file.write(self.pub_key)
-            with open(priv_system_path,'x') as self.priv_key_file:
-                self.priv_key = str(self.n)+str(self.d)
-                self.priv_key_file.write(self.priv_key)
-        elif overwrite:
-            with open(pub_system_path,'w') as self.pub_key_file:
-                self.pub_key = str(self.n)+str(self.e)
-                self.pub_key_file.write(self.pub_key)
-            with open(priv_system_path,'w') as self.priv_key_file:
-                self.priv_key = str(self.n)+str(self.d)
-                self.priv_key_file.write(self.priv_key)
-        else:
-            raise("[ERROR] I/O error, please check path")
+            m = 'x'
+        if overwrite:
+            m = 'w'
 
-
-
-
-     
-    
+        with open(pub_system_path, m) as self.pub_key_file:
+            self.pub_key = str(self.n)+":"+str(self.e)
+            self.pub_key_file.write(self.pub_key)
+        with open(priv_system_path, m) as self.priv_key_file:
+            self.priv_key = str(self.n)+":"+str(self.d)
+            self.priv_key_file.write(self.priv_key)
             

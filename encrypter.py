@@ -1,49 +1,63 @@
-# C = M^e mod n
-# M = C^d mod n
-
 import string, math
 from keygen import KeyContainer
 
-CHARSET = string.ascii_letters+string.digits+"@#$%^&*()<>-=,.?:;[]/!\\\`\'\""+string.whitespace
-
 class _BlockAssembler:
 
-    def __init__(self, stream=0, block_integer=0, raw_block_integer=0, exp=0, str_block_integer=None):
-        self.stream = stream
-        self.block_integer = block_integer
-        self.raw_block_integer = raw_block_integer
-        self.str_block_integer = str_block_integer
-        self.exp = exp
+    CHARSET = string.ascii_letters+string.digits+"@#$%^&*()<>-=,.?:;[]/!\\`\'\""+string.whitespace
 
-    def assemble_block(self, stream):
-        self.raw_block_integer = 0
-        for i in self.stream:
-            self.raw_block_integer += CHARSET.index(i) * (pow(len(CHARSET),self.exp))
+    def __init__(self, integer_block=0, raw_integer_block=0, keysize=1024, block_size=0):
+        self.integer_block = integer_block
+        self.raw_integer_block = raw_integer_block
+        self.keysize = keysize
+        self.block_size = block_size
+    
+    def __len__(self):
+        x, y = pow(2, self.keysize), pow(len(__class__.CHARSET), self.block_size)
+        if x >= y:
+            return True
+        else:
+            return False
+
+    # 2^keylen > CHARSET^len(block_integer)
+    def _assemble_raw_block(self, raw_data):
+        self.exp=0
+        for i in raw_data:
+            self.raw_integer_block += __class__.CHARSET.index(i) * (pow(len(__class__.CHARSET),self.exp))
             self.exp+=1
-        self.str_block_integer = str(self.raw_block_integer)
-        self.block_integer = [self.str_block_integer[i:i+len(CHARSET)] for i in range(0,len(self.str_block_integer),len(CHARSET))]
-        return self.block_integer
+        
+        return self.raw_integer_block
 
-class BlockEncrypter:
+    def _get_block_len(self):
+        while True:
+            self.block_size+=1
+            print(self.block_size)
+            if self.__len__() == False:
+                return self.block_size - 1
+
+    
+    def _format_block(self):
+        block, block_size = self.raw_integer_block, self._get_block_len
+
+# Take block as list and 
+class BlockEncrypter(_BlockAssembler):
 
     def __init__(self,
-                stream,
-                block_container,
-                block_assembler,
-                encrypted_block=0, 
+                stream=0, 
+                keysize=0,
                 public_key=0, 
-                private_key=0, 
-                keysize=1024):
+                private_key=0):
         
         self.stream = stream
         self.keysize = keysize
-        self.block_assembler = _BlockAssembler()
-        self.block_container = block_assembler.assemble_block(self.stream)
-        self.encrypted_block = encrypted_block
+        self.assembler = _BlockAssembler()
         self.public_key = public_key
         self.private_key = public_key
 
-    def encrypt(self, public_key):
-        for self.block in self.block_container:
-            self.encrypted_block = self.block
+    # C = M^e mod n
+    # M = C^d mod n
+    # def encrypt(self, stream, public_key):
+    #     self.public_key = self.public_key.split(':')
+
+    #     for self.block in self.assembler:
+    #         self.cipher_block = pow(self.block, )
 
