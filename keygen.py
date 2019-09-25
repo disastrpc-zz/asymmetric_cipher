@@ -76,12 +76,9 @@ class KeyContainer(_KeyGenerator):
             return len(str(arg))
 
     def to_file(self, path, overwrite=False):
-        if platform.startswith('linux'):
-            pub_system_path = os.path.join(path,'pk_pub.dat')
-            priv_system_path = os.path.join(path,'pk_priv.dat')
-        elif platform.startswith('win32'):
-            print('not implemented')
-            pass
+
+        pub_system_path = os.path.join(path,'pk_pub.dat')
+        priv_system_path = os.path.join(path,'pk_priv.dat')
 
         if not overwrite:
             m = 'x'

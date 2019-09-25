@@ -1,23 +1,29 @@
 import string, math
 from keygen import KeyContainer
 
-class _BlockAssembler:
+# Takes  
+
+class _BlockContainer:
+
+    def __init__(self, keysize=1024, assembled_blocks=0, block_size=0):
+        self.assembled_blocks = assembled_blocks
+        self.keysize = keysize
+        self.block_size = block_size
+
+class _BlockAssembler(_BlockContainer):
 
     CHARSET = string.ascii_letters+string.digits+"@#$%^&*()<>-=,.?:;[]/!\\`\'\""+string.whitespace
 
-    def __init__(self, integer_block=0, raw_integer_block=0, keysize=1024, block_size=0):
+    def __init__(self, integer_block=0, raw_integer_block=0):
         self.integer_block = integer_block
         self.raw_integer_block = raw_integer_block
-        self.keysize = keysize
-        self.block_size = block_size
-    
+
     def __len__(self):
-        x, y = pow(2, self.keysize), pow(len(__class__.CHARSET), self.block_size)
-        if x >= y:
+        if pow(2, self.keysize) > pow(len(__class__.CHARSET), self.block_size):
             return True
         else:
             return False
-
+    
     # 2^keylen > CHARSET^len(block_integer)
     def _assemble_raw_block(self, raw_data):
         self.exp=0
@@ -25,39 +31,37 @@ class _BlockAssembler:
             self.raw_integer_block += __class__.CHARSET.index(i) * (pow(len(__class__.CHARSET),self.exp))
             self.exp+=1
         
-        return self.raw_integer_block
+        return str(self.raw_integer_block)
 
-    def _get_block_len(self):
+    def _get_block_size(self):
         while True:
-            self.block_size+=1
-            print(self.block_size)
             if self.__len__() == False:
-                return self.block_size - 1
+                return self.block_size
+            self.block_size+=1
 
-    
-    def _format_block(self):
-        block, block_size = self.raw_integer_block, self._get_block_len
+
+    def _format_block(self, raw_data):
+        self.block, self.block_size = self._assemble_raw_block(raw_data), (self._get_block_size() - 1)
+        return [self.block[i:i + self.block_size - 1] for i in range(0, len(self.block), self.block_size)]
+
+
 
 # Take block as list and 
 class BlockEncrypter(_BlockAssembler):
 
     def __init__(self,
-                stream=0, 
-                keysize=0,
-                public_key=0, 
-                private_key=0):
+                public_key='', 
+                private_key=''):
         
-        self.stream = stream
-        self.keysize = keysize
-        self.assembler = _BlockAssembler()
         self.public_key = public_key
         self.private_key = public_key
 
     # C = M^e mod n
     # M = C^d mod n
-    # def encrypt(self, stream, public_key):
-    #     self.public_key = self.public_key.split(':')
+    def encrypt(self, raw_data, public_key):
+        self.public_key_arr = self.public_key.split(':')
+        block = super()._format_block(raw_data)
 
-    #     for self.block in self.assembler:
-    #         self.cipher_block = pow(self.block, )
+        print(self.public_key[0])
+        print(self.public_key[1])
 

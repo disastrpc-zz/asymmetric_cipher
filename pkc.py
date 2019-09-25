@@ -2,7 +2,7 @@
 
 import cryutils, argparse, string, sys, os
 from time import perf_counter as prog
-from encrypter import _BlockAssembler
+from encrypter import _BlockAssembler, BlockEncrypter, _BlockContainer
 from helper import Helper
 from keygen import KeyContainer
 from logging import log
@@ -35,24 +35,25 @@ def main():
         Helper.show_help()
     elif 'gen' in namespace.mode:
         key_container = KeyContainer(namespace.keysize)
-        Helper.generate(namespace.keysize)
+        Helper.message_generate(namespace.keysize)
         t_start = prog()
         key_container.generate()
         t_stop = prog()
         if namespace.force:
             key_container.to_file(namespace.output, overwrite=True)
-            Helper.success_timed(t_start, t_stop)
+            Helper.message_success_timed(t_start, t_stop)
         elif namespace.print:            
             sys.stdout.write(key_container.__str__()+'\n')
-            Helper.success_timed(t_start, t_stop)
+            Helper.message_success_timed(t_start, t_stop)
         else:
             key_container.to_file(namespace.output)
-            Helper.success_timed(t_start, t_stop)
+            Helper.message_success_timed(t_start, t_stop)
     elif 'en' in namespace.mode:
         with open(namespace.input,'r') as f:
             raw_data = f.read()
-            print(assembler._get_block_len())
-
+            encrypter = BlockEncrypter()
+            
+            encrypter.encrypt(raw_data, str(namespace.pub_key))
 
 
 if __name__ == '__main__':

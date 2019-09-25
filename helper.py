@@ -42,16 +42,16 @@ class Helper(_KeyGenerator):
     pkc.py de -f myfile.txt --pubkey /home/user/pk_pub.dat''')
 
     @staticmethod
-    def success_timed(t_start, t_stop):
-        stdout.write("[LOG] Operation successful. Elapsed time ~{} seconds.".format(int(t_stop - t_start))+'\n')
+    def message_success_timed(t_start, t_stop):
+        stdout.write("[INFO] Operation successful. Elapsed time ~{} seconds.".format(int(t_stop - t_start))+'\n')
 
     @staticmethod
-    def metrics(pub_key, priv_key):
-        stdout.write('[LOG] Public key is size {} \n'.format(pub_key))
-        stdout.write('[LOG] Private key is size {} \n'.format(priv_key))
+    def message_metrics(pub_key, priv_key):
+        stdout.write('[INFO] Public key is size {} \n'.format(pub_key))
+        stdout.write('[INFO] Private key is size {} \n'.format(priv_key))
         
     @staticmethod
-    def generate(keysize):
+    def message_generate(keysize):
         stdout.write("[INFO] Generating private and public keys with size {} bits for p and q...".format(keysize)+'\n')
 
     @staticmethod
