@@ -1,9 +1,9 @@
+import time, threading, os
 from keygen import KeyContainer, _KeyGenerator
 from numbers import Integral
 from itertools import cycle
-from threading import Thread
-from time import sleep
-from sys import stdout
+from sys import stdout, platform
+from ctypes import pythonapi, py_object
 
 # Helper class creates helper objects to aid in logging and outputting text
 # Contains --help for pkc
@@ -54,17 +54,76 @@ class Helper(_KeyGenerator):
     def message_generate(keysize):
         stdout.write("[INFO] Generating private and public keys with size {} bits for p and q...".format(keysize)+'\n')
 
-    @staticmethod
-    def animate():
-        brk = False
-        for c in cycle(['|', '/', '-', '\\']):
-            if brk:
-                break
-            stdout.write('\rloading ' + c)
-            stdout.flush()
-            sleep(0.1)
-        stdout.write('\rDone!     ')
 
-def bit_lenght(a):
-    s = bin(a).lstrip('-0b')
-    return str(len(s))
+class Helper_Thread(threading.Thread):
+
+    def __init__(self,name,msg,inter=0.065):
+        threading.Thread.__init__(self)
+        self.name = name
+        self.msg = msg
+        self.inter = inter
+
+    def __repr__(self):
+        return '{self.__class__.__name__}({self.name}, {self.msg}, {self.inter})'.format(self=self)
+    
+    # load specified animation set
+    def run(self):
+        try:
+            while True:
+                __class__.load_animation(self.msg, self.inter)
+        finally:
+            __class__.load_animation(self.msg,self.inter,run=False)
+
+    # get id for each tread
+    def get_id(self): 
+        for id, thread in threading._active.items(): 
+            if thread is self: 
+                return id
+
+    # exits the interpreter 'gracefully' when called
+    def kill(self):
+        thread_id = self.get_id() 
+        res = pythonapi.PyThreadState_SetAsyncExc(thread_id, py_object(SystemExit)) 
+        if res > 1: 
+            pythonapi.PyThreadState_SetAsyncExc(thread_id, 0) 
+
+    @staticmethod
+    def load_animation(msg, inter, run=True):
+
+        # unpack vars
+        load_msg, animation = msg, "|/-\\"   
+        msg_len = len(load_msg) 
+        i, count_time, animation_count = 0,0,0  
+        load_str_list = list(load_msg)   
+        y = 0                  
+        while True: 
+            # controls animation speed. can be provided to the class instance as inter=int
+            time.sleep(inter)   
+
+            # get ASCII
+            x = ord(load_str_list[i])            
+            y = 0                             
+            if x != 32 and x != 46:              
+                if x>90: 
+                    y = x-32
+                else: 
+                    y = x + 32
+                load_str_list[i]= chr(y) 
+
+            # to s
+            out = ''
+            for j in range(msg_len): 
+                out += load_str_list[j]   
+
+            stdout.write("\r"+"[INFO] " + out + " " + animation[animation_count]) 
+            stdout.flush() 
+            load_msg = out 
+            animation_count = (animation_count + 1) % 4
+            i = (i + 1) % msg_len 
+            count_time += 1
+
+            if not run:
+                print('\n')
+                break
+      
+

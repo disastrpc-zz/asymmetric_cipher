@@ -4,6 +4,7 @@
 # Jared @ github.com/disastrpc
 
 import string, math
+from tqdm import tqdm as prog
 from keygen import KeyContainer
 
 # BlockAssembler takes raw data and outputs fixed lenght block sizes. This is handled by the __len__ method.
@@ -45,27 +46,38 @@ class _BlockAssembler:
 
     # Create generator that returns list with block_size lenght blocks
     def _get_formatted_blocks(self, raw_data):
-        self.block, self.block_size = self._assemble_raw_block(raw_data), (self._get_block_size() - 1)
-        return [self.block[i:i + self.block_size] for i in range(0, len(self.block), self.block_size)]
+        self.raw_block, self.block_size = self._assemble_raw_block(raw_data), (self._get_block_size() - 1)
+        return [self.raw_block[i:i + self.block_size] for i in range(0, len(self.raw_block), self.block_size)]
 
 # BlockEncrypter holds encrypt and decrypt methods
 class BlockEncrypter(_BlockAssembler):
 
     def __init__(self,
-                public_key='', 
-                private_key='',
+                pub_key=0, 
+                priv_key=0,
                 raw_integer_block=0,
-                block_size=0):
+                block_size=0,
+                cipher_blocks=[],
+                plain_text_blocks=''):
         
-        self.public_key = public_key
-        self.private_key = public_key
+        self.pub_key = pub_key
+        self.priv_key = priv_key
         self.raw_integer_block = raw_integer_block.__class__()
         self.block_size = block_size.__class__()
-        
+        self.cipher_blocks = cipher_blocks
+        self.plain_text_blocks = plain_text_blocks
 
+    @staticmethod    
+    def split_key(key):
+        return key.split(":")
+       
     # C = M^e mod n
     # M = C^d mod n
-    def encrypt(self, raw_data, public_key):
-        self.public_key_arr = self.public_key.split(':')
-        block = super()._get_formatted_blocks(raw_data)
-        print(block[2])
+    def encrypt(self, raw_data, pub_key):
+        self.pub_key = self.split_key(pub_key)
+        self.blocks = super()._get_formatted_blocks(raw_data)
+        for block in prog(self.blocks):
+            self.cipher_block = pow(int(block), int(self.pub_key[1]), int(self.pub_key[0]))
+            self.cipher_blocks.append(self.cipher_block)
+        return self.cipher_blocks
+

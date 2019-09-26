@@ -35,7 +35,6 @@ class _KeyGenerator:
     # e must be relatively prime to p*q which is calculated using
     # the equation e = (p - 1) * (q - 1)
     def _comp_e(self):
-
         while True:  
             # while true try number    
             self.e = randrange(2 ** (self.keysize - 1), 2 ** (self.keysize))
@@ -66,7 +65,7 @@ class KeyContainer(_KeyGenerator):
         self.pub_key = pub_key
     
     def __repr__(self):
-        return '{self.__class__.__name__}({self},{self},{self})'.format(self=self)
+        return '{self.__class__.__name__}({self.keysize},{self.priv_key},{self.pub_key})'.format(self=self)
     
     def __str__(self):
         return "Public key: "+str(self.n)+str(self.e)+'\n'+"Private key: "+str(self.n)+str(self.d)

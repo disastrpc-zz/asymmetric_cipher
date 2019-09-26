@@ -2,8 +2,8 @@
 
 import cryutils, argparse, string, sys, os
 from time import perf_counter as prog
-from encrypter import _BlockAssembler, BlockEncrypter
-from helper import Helper
+from encrypter import BlockEncrypter
+from helper import Helper, Helper_Thread
 from keygen import KeyContainer
 from logging import log
 from threading import Thread
@@ -32,12 +32,18 @@ def main():
     namespace = parse()
     if namespace.help:
         Helper.show_help()
+
     elif 'gen' in namespace.mode:
         key_container = KeyContainer(namespace.keysize)
-        Helper.message_generate(namespace.keysize)
+        msg = "generating public and private keys......"
+        t = Helper_Thread('anim',msg)
         t_start = prog()
+        t.start()
         key_container.generate()
         t_stop = prog()
+        t.kill()
+        t.join()
+        
         if namespace.force:
             key_container.to_file(namespace.output, overwrite=True)
             Helper.message_success_timed(t_start, t_stop)
@@ -47,6 +53,7 @@ def main():
         else:
             key_container.to_file(namespace.output)
             Helper.message_success_timed(t_start, t_stop)
+
     elif 'en' in namespace.mode:
         kf = open(namespace.pub_key,'r')
         pub_key_path = kf.read()
@@ -55,7 +62,8 @@ def main():
         with open(namespace.input,'r') as f:
             raw_data = f.read()
             encrypter = BlockEncrypter()
-            encrypter.encrypt(raw_data, pub_key_path)
+            cipher_text = encrypter.encrypt(raw_data, pub_key_path)
+            print(cipher_text)
 
 
 if __name__ == '__main__':
