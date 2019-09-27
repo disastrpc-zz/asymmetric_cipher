@@ -65,9 +65,6 @@ class KeyContainer(_KeyGenerator):
         self.priv_key = priv_key
         self.pub_key = pub_key
     
-    def __repr__(self):
-        return '{self.__class__.__name__}({self.keysize},{self.priv_key},{self.pub_key})'.format(self=self)
-    
     def __str__(self):
         return "Public key: "+str(self.n)+str(self.e)+'\n'+"Private key: "+str(self.n)+str(self.d)
 
