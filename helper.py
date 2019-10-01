@@ -42,8 +42,8 @@ class Helper(_KeyGenerator):
     pkc.py de -f myfile.txt --pubkey /home/user/pk_pub.dat''')
 
     @staticmethod
-    def message_success_timed(t_start, t_stop):
-        stdout.write("[INFO] Operation successful. Elapsed time ~{} seconds.".format(int(t_stop - t_start))+'\n')
+    def message_success_timed(t1, t2):
+        stdout.write("[INFO] Operation finished. Elapsed time ~{} seconds.".format(int(t1 - t2))+'\n')
 
     @staticmethod
     def message_metrics(pub_key, priv_key):
@@ -55,7 +55,7 @@ class Helper(_KeyGenerator):
         stdout.write("[INFO] Generating private and public keys with size {} bits for p and q...".format(keysize)+'\n')
 
 
-class Helper_Thread(threading.Thread):
+class HelperThread(threading.Thread):
 
     def __init__(self,name,msg,inter=0.065):
         threading.Thread.__init__(self)

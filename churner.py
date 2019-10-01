@@ -1,17 +1,25 @@
 # Data churner module for the Public Key Cipher
 #
-# Generate keys, digest raw or encrypted data 
-# and output results
+# Generate keys, digest raw or encrypted data and output results
+# - Keycontainer child class handles random number generation and computation of n e and d through its parent _KeyGenerator.
+#        _comp methods are called by the KeyContainer child class using the generate() method.
+#       All _comp methods should be considered implementation details.
+#
+# _BlockAssembler takes raw data and outputs fixed lenght block sizes. This is handled by the __len__ method. BlockHandler contains encrypt and decrypt methods.
+#       2^keylen > CHARSET^len(integer_block) must hold true.
 # Jared @ github.com/disastrpc
+
+__author__ = 'Jared'
+__license__ = 'GNU GPL'
+__all__ = [
+    'KeyContainer',
+    'BlockHandler'
+]
 
 import string, math, cryutils, os.path
 from tqdm import tqdm as prog
 from random import randrange
 from sys import platform
-
-# _KeyGenerator parent class handles random number generation and computation of n e and d
-# _comp methods are called by the KeyContainer child class using the generate() method
-# All _comp methods should be considered implementation details.
 
 class _KeyGenerator:
 
@@ -26,7 +34,7 @@ class _KeyGenerator:
         self.n = n
         self.e = e
         self.d = d
-    
+
     # compute n using equation n = p * q
     def _comp_n(self):
         self.n = self.p * self.q
@@ -61,10 +69,11 @@ class _KeyGenerator:
 class KeyContainer(_KeyGenerator):
     
     def __init__(self, keysize, priv_key=0, pub_key=0):
+        _KeyGenerator.__init__(self, keysize)
         self.keysize = keysize
         self.priv_key = priv_key
         self.pub_key = pub_key
-    
+
     def __str__(self):
         return "Public key: "+str(self.n)+str(self.e)+'\n'+"Private key: "+str(self.n)+str(self.d)
 
@@ -89,10 +98,6 @@ class KeyContainer(_KeyGenerator):
             self.priv_key = str(self.n)+":"+str(self.d)
             self.priv_key_file.write(self.priv_key)
 
-
-
-# BlockAssembler takes raw data and outputs fixed lenght block sizes. This is handled by the __len__ method.
-# 2^keylen > CHARSET^len(integer_block) must hold true.
 class _BlockAssembler:
 
     # Will throw error if data contains text outside charset
@@ -155,9 +160,7 @@ class BlockHandler(_BlockAssembler):
     def split_key(key):
         return key.split(":")
        
-    # C = M^e mod n
-    # M = C^d mod n
-    def encrypt(self, raw_data, pub_key):
+    def encrypt(self, raw_data, pub_key, output):
         self.pub_key = self.split_key(pub_key)
         self.blocks = super()._get_formatted_blocks(raw_data)
         for block in prog(self.blocks):
