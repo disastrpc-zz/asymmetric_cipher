@@ -1,72 +1,349 @@
 #!/usr/bin/env python
 
-import cryutils, argparse, string, sys, os
+__author__ = 'Jared'
+__license__ = 'GNU GPL'
+
+import cryutils, argparse, string, os, cryutils, math
+from sys import path, stderr, stdout
 from time import perf_counter as prog
-from churner import KeyContainer, BlockHandler
-from helper import Helper, Helper_Thread
+from time import sleep
 from logging import log
 from threading import Thread
+from tqdm import tqdm as bar
+from random import randrange
+from pathlib import Path
+from numbers import Integral
+from itertools import cycle
+from ctypes import pythonapi, py_object
 
-def parse():
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument('-h','--help',dest='help',action='store_true')
+# Data churner classes
+#
+# Generate keys, digest raw or encrypted data and output results
+# - Keycontainer child class handles random number generation and computation of n e and d through its parent _KeyGenerator.
+#        _comp methods are called by the KeyContainer child class using the generate() method.
+#       All _comp methods should be considered implementation details.
+#
+# _BlockAssembler takes raw data and outputs fixed lenght block sizes. This is handled by the __len__ method. BlockHandler contains encrypt and decrypt methods.
+#       2^keylen > CHARSET^len(integer_block) must hold true.
+# Jared @ github.com/disastrpc
 
-    # mode arg
-    parser.add_argument('mode',nargs='*')
+class _KeyGenerator:
 
-    # gen mode
-    parser.add_argument('-l','--lenght',default=1024,type=int,dest='keysize')
-    parser.add_argument('-o','--output',dest='output')
-    parser.add_argument('--force',action='store_true',dest='force')
-    parser.add_argument('--print',action='store_true',dest='print')
+    def __init__(
+            self,
+            keysize,
+            n=0,e=0,d=0,p=0,q=0):
 
-    # en/de mode
-    parser.add_argument('-f','--file',dest='input')
-    parser.add_argument('--privatekey',dest='priv_key')
-    parser.add_argument('--publickey',dest='pub_key')
-    namespace = parser.parse_args()
-    return namespace
+        self.keysize = keysize
+        self.p = cryutils.genPrime(self.keysize)
+        self.q = cryutils.genPrime(self.keysize)
+        self.n = n
+        self.e = e
+        self.d = d
 
-def main():
-    namespace = parse()
-    if namespace.help:
-        Helper.show_help()
+    # compute n using equation n = p * q
+    def _comp_n(self):
+        self.n = self.p * self.q
+        return self.n
+    
+    # Compute e
+    # e must be relatively prime to p*q which is calculated using
+    # the equation e = (p - 1) * (q - 1)
+    def _comp_e(self):
+        while True:  
+            # while true try number    
+            self.e = randrange(2 ** (self.keysize - 1), 2 ** (self.keysize))
+            # Check numbers are relative primes
+            if(math.gcd(self.e,(self.p - 1) * (self.q - 1))==1):
+                return self.e
 
-    elif 'gen' in namespace.mode:
-        repr(KeyContainer(1024,1726917693118203110852644560454016525004115359300824263296084065946873781184622504322522371051917142494394093810603312425182490138976308391110332614971794788367953963954640405753506718343322160891249771427327017993564339195970747899537634026455097966077921556910208570012072027120804529641388150204056275879744188250771911339580506488489290365280044988274639121672002746911359523512205578280205367899808644471799000772980742218181641451212673468173671082737792457054295777196743610706076218274169613668795529016650237820121777816081953272736938973826250329235743597402302678176894123805341495853141643362719511003647112017103674433126640714534510270386374025383894119128275193977338135943879785362663134457826690391291571380297361617732959779884293682100313863613044330460847387150627153297771463856431292004880348608813846896305271241812084283949342666692184352802050371674398538880775756832335481162598441114976335769004254730944745144104443745691393981667988410936513745493684589866975150546177995786505937261450100208759919482126671516048449906573887411773746290527030735332268199750593199117335135385611864258484192565534456512542688643786051652653382579818786462822347118037327993222349876402815514225450812047058272316350190579,17269176931182031108526445604540165250041153593008242632960840659468737811846225043225223710519171424943940938106033124251824901389763083911103326149717947883679539639546404057535067183433221608912497714273270179935643391959707478995376340264550979660779215569102085700120720271208045296413881502040562758797441882507719113395805064884892903652800449882746391216720027469113595235122055782802053678998086444717990007729807422181816414512126734681736710827377924570542957771967436107060762182741696136687955290166502378201217778160819532727369389738262503292357435974023026781768941238053414958531416433627195110036471109614955720967248444035430236361960995640422669278781028073143168477235350344566010248498450564035018065704367883204890644310632939186133785115806810790294591065440623763508570333844307632083531777169099369169725904948945901819915628188176883818096581169177761335279812323156177088211685873359568787751175419))
+    # Compute d
+    # Parameters for the modInverse(a, m) func must be relatively prime.
+    def _comp_d(self):
+        self.d = cryutils.modInverse(self.e, (self.p - 1) * (self.q - 1))
+        return self.d
+
+    # Create KeyGenerator instance and assign keys to instance of object
+    def generate(self):
+        self.gen = _KeyGenerator(self.keysize)
+        self.n = self.gen._comp_n()
+        self.e = self.gen._comp_e()
+        self.d = self.gen._comp_d()
+        return self.n, self.e, self.d
+
+# KeyContainer generates and formats private and public keys for display and storage
+class KeyContainer(_KeyGenerator):
+    
+    def __init__(self, keysize, priv_key=0, pub_key=0):
+        _KeyGenerator.__init__(self, keysize)
+        self.keysize = keysize
+        self.priv_key = priv_key
+        self.pub_key = pub_key
+
+    def __str__(self):
+        return "Public key: "+str(self.n)+str(self.e)+'\n'+"Private key: "+str(self.n)+str(self.d)
+
+    def __len__(self, *args):
+        for arg in args:
+            return len(str(arg))
+
+    def to_file(self, path, overwrite=False):
+
+        pub_system_path = os.path.join(path,'pk_pub.dat')
+        priv_system_path = os.path.join(path,'pk_priv.dat')
+
+        if not overwrite:
+            m = 'x'
+        if overwrite:
+            m = 'w'
+
+        with open(pub_system_path, m) as self.pub_key_file:
+            self.pub_key = str(self.n)+":"+str(self.e)
+            self.pub_key_file.write(self.pub_key)
+        with open(priv_system_path, m) as self.priv_key_file:
+            self.priv_key = str(self.n)+":"+str(self.d)
+            self.priv_key_file.write(self.priv_key)
+
+class _BlockAssembler:
+
+    # Will throw error if data contains text outside charset
+    CHARSET = string.ascii_letters+string.digits+"@#$%^&*()<>-=,.?:;[]/!\\`\'\""+string.whitespace
+
+    def __init__(self, keysize=1024, integer_block=0, block_size=0, raw_integer_block=0, assembled_blocks=0):
+        self.keysize = keysize
+        self.integer_block = integer_block
+        self.block_size = block_size
+        self.raw_integer_block = raw_integer_block
+        self.assembled_blocks = assembled_blocks
+
+    # Checks for proper lenght of individual blocks
+    def __len__(self):
+        if pow(2, __class__().keysize) > pow(len(__class__().CHARSET), self.block_size):
+            return True
+        else:
+            return False
+    
+    # Assemble raw block and return as string
+    def _assemble_raw_block(self, raw_data):
+        self.exp=0
+        for i in raw_data:
+            # For index location in character multiply by the len of the charset and an incrementing exponent
+            self.raw_integer_block += __class__().CHARSET.index(i) * (pow(len(__class__().CHARSET),self.exp))
+            self.exp+=1      
+        return str(self.raw_integer_block)
+
+    # Call __len__ to get the maximum block size
+    def _get_block_size(self):
+        while True:
+            if self.__len__() is False:
+                return self.block_size
+            self.block_size+=1
+
+    # Create generator that returns list with block_size lenght blocks
+    def _get_formatted_blocks(self, raw_data):
+        self.raw_block, self.block_size = self._assemble_raw_block(raw_data), (self._get_block_size() - 1)
+        return [self.raw_block[i:i + self.block_size] for i in range(0, len(self.raw_block), self.block_size)]
+
+# BlockHandler holds encrypt and decrypt methods
+class BlockHandler(_BlockAssembler):
+
+    def __init__(self,
+                pub_key=0, 
+                priv_key=0,
+                raw_integer_block=0,
+                block_size=0,
+                cipher_blocks=[],
+                plain_text_blocks=''):
         
-        # key_container = KeyContainer(namespace.keysize)
-        # msg = "generating public and private keys......"
-        # t = Helper_Thread('anim',msg)
-        # t_start = prog()
-        # t.start()
-        # key_container.generate()
-        # t_stop = prog()
-        # t.kill()
-        # t.join()
+        self.pub_key = pub_key
+        self.priv_key = priv_key
+        self.raw_integer_block = raw_integer_block.__class__()
+        self.block_size = block_size.__class__()
+        self.cipher_blocks = cipher_blocks
+        self.plain_text_blocks = plain_text_blocks
+
+    @staticmethod    
+    def split_key(key):
+        return key.split(":")
+       
+    def encrypt(self, raw_data, pub_key, output):
+        self.pub_key = self.split_key(pub_key)
+        self.blocks = super()._get_formatted_blocks(raw_data)
+        for block in bar(self.blocks):
+            self.cipher_block = pow(int(block), int(self.pub_key[1]), int(self.pub_key[0]))
+            self.cipher_blocks.append(self.cipher_block)
+        return self.cipher_blocks
+
+# Helper class creates helper objects to aid in logging and outputting text
+# Contains help
+class Helper(_KeyGenerator):
+
+    @staticmethod
+    def show_help():
+        stdout.write('''pkc.py: Public Key Cipher Python implementation
+    by Jared Freed | https://github.com/disastrpc/pkc
+    Usage:
+
+    pkc.py [mode] [args]
+
+    Modes:
+
+    Key generator
+    gen
+        -l --lenght - specify keylen, if none default of 1024 bits is used
+        -o --output - output path
+        --force     - overwrite existing key file
+        --print     - print keys to screen
+
+    Encrypter
+    en
+        --privkey   - specify path to private key
+        -f --file   - specify path to file
+
+    Decrypter
+    de
+        --pubkey    - specify path to public key
+        -f --file   - specify path to file
+
+    Examples:
+    pkc.py gen -l 2048 -o /home/user
+    pkc.py en --privkey /root/pk_priv.dat -f myfile.txt
+    pkc.py de -f myfile.txt --pubkey /home/user/pk_pub.dat''')
+
+    @staticmethod
+    def message_finish_timed(t1, t2):
+        stdout.write('[INFO] Operation finished. Elapsed time ~{} seconds'.format(int(t1 - t2))+'\n')
+
+    @staticmethod
+    def message_metrics(pub_key, priv_key):
+        stdout.write('[INFO] Public key is size {} \n'.format(pub_key))
+        stdout.write('[INFO] Private key is size {} \n'.format(priv_key))
         
-        # if namespace.force:
-        #     key_container.to_file(namespace.output, overwrite=True)
-        #     Helper.message_success_timed(t_start, t_stop)
-        # elif namespace.print:   
-        #     print(key_container.__repr__())  
-        #     sys.stdout.write(key_container.__str__()+'\n')
-        #     Helper.message_success_timed(t_start, t_stop)
-        # else:
-        #     key_container.to_file(namespace.output)
-        #     Helper.message_success_timed(t_start, t_stop)
-
-    elif 'en' in namespace.mode:
-        kf = open(namespace.pub_key,'r')
-        pub_key_path = kf.read()
-        kf.close()
-        
-        with open(namespace.input,'r') as f:
-            raw_data = f.read()
-            encrypter = BlockHandler()
-            cipher_text = encrypter.encrypt(raw_data, pub_key_path)
-            print(cipher_text)
+    @staticmethod
+    def message_generate(keysize):
+        stdout.write("[INFO] Generating private and public keys with size {} bits for p and q...".format(keysize)+'\n')
 
 
-if __name__ == '__main__':
-    main()   
+class HelperThread(Thread):
+
+    def __init__(self,name,msg,inter=0.065):
+        Thread.__init__(self)
+        self.name = name
+        self.msg = msg
+        self.inter = inter
+
+    def __repr__(self):
+        return '{self.__class__.__name__}({self.name}, {self.msg}, {self.inter})'.format(self=self)
+    
+    # load specified animation set
+    def run(self):
+        try:
+            while True:
+                __class__.load_animation(self.msg, self.inter)
+        finally:
+            __class__.load_animation(self.msg,self.inter,run=False)
+
+    # get id for each tread
+    def get_id(self): 
+        for id, thread in Thread._active.items(): 
+            if thread is self: 
+                return id
+
+    # exits the interpreter 'gracefully' when called
+    def kill(self):
+        thread_id = self.get_id() 
+        res = pythonapi.PyThreadState_SetAsyncExc(thread_id, py_object(SystemExit)) 
+        if res > 1: 
+            pythonapi.PyThreadState_SetAsyncExc(thread_id, 0) 
+
+    @staticmethod
+    def load_animation(msg, inter, run=True):
+
+        # unpack vars
+        load_msg, animation = msg, "|/-\\"   
+        msg_len = len(load_msg) 
+        i, count_time, animation_count = 0,0,0  
+        load_str_list = list(load_msg)   
+        y = 0                  
+        while True: 
+            # controls animation speed. can be provided to the class instance as inter=int
+            time.sleep(inter)   
+
+            # get ASCII
+            x = ord(load_str_list[i])            
+            y = 0                             
+            if x != 32 and x != 46:              
+                if x>90: 
+                    y = x-32
+                else: 
+                    y = x + 32
+                load_str_list[i]= chr(y) 
+
+            # to s
+            out = ''
+            for j in range(msg_len): 
+                out += load_str_list[j]   
+
+            stdout.write("\r"+"[INFO] " + out + " " + animation[animation_count]) 
+            stdout.flush() 
+            load_msg = out 
+            animation_count = (animation_count + 1) % 4
+            i = (i + 1) % msg_len 
+            count_time += 1
+
+            if not run:
+                print('\n')
+                break
+
+def gen(keysize=1024):
+    keys = KeyContainer(keysize)
+    metric_start = prog()
+    keys.generate()
+    metric_stop = prog()
+    try:
+        if namespace.force:
+            keys.to_file(namespace.output, overwrite=True)
+        elif namespace.print:
+            stdout.write(keys.__str__()+'\n')
+        else:
+            keys.to_file(namespace.output)
+    except FileExistsError as file_exists_exept:
+        stderr.write(str(file_exists_exept))
+    except TypeError:
+        stderr.write("[ERROR] Please provide an output path")
+    finally:
+        Helper.message_finish_timed(metric_start, metric_stop)
+            
+def en():
+    pass
+
+def de():
+    pass
+
+SWITCHER = {
+    'help': Helper.show_help,
+    'gen': gen,
+    'en': en,
+    'de': de
+}
+# def parse():
+parser = argparse.ArgumentParser(add_help=False)
+
+# mode args
+parser.add_argument(dest='mode',choices=SWITCHER.keys())
+
+# gen mode
+parser.add_argument('-l','--lenght',default=1024,type=int,dest='keysize')
+parser.add_argument('-o','--output',dest='output')
+parser.add_argument('--force',action='store_true',dest='force')
+parser.add_argument('--print',action='store_true',dest='print')
+
+# en/de mode
+parser.add_argument('-f','--file',dest='input')
+parser.add_argument('--privatekey',dest='priv_key')
+parser.add_argument('--publickey',dest='pub_key')
+namespace = parser.parse_args()
+
+      
+           
+SWITCHER[namespace.mode]()
