@@ -156,7 +156,7 @@ class BlockHandler(_BlockAssembler):
                 block_size=0,
                 cipher_blocks=[],
                 plain_text_blocks=''):
-        
+        _BlockAssembler.__init__(self)
         self.pub_key = pub_key
         self.priv_key = priv_key
         self.raw_integer_block = raw_integer_block.__class__()
@@ -167,6 +167,20 @@ class BlockHandler(_BlockAssembler):
     @staticmethod    
     def split_key(key):
         return key.split(":")
+
+    @staticmethod
+    def read_key(path):
+        key_file = open(path, 'r')
+        key = key_file.read()
+        key_file.close()
+        return key
+    
+    @staticmethod
+    def read_file(path):
+        content = open(path, 'r')
+        data = content.read()
+        content.close()
+        return data
        
     def encrypt(self, raw_data, pub_key, output):
         self.pub_key = self.split_key(pub_key)
@@ -175,6 +189,26 @@ class BlockHandler(_BlockAssembler):
             self.cipher_block = pow(int(block), int(self.pub_key[1]), int(self.pub_key[0]))
             self.cipher_blocks.append(self.cipher_block)
         return self.cipher_blocks
+
+    def decrypt(self, cipher_blocks, priv_key, output):
+        self.priv_key = self.split_key(priv_key)
+
+    def to_file(self, path, overwrite=False):
+
+        file_system_path = os.path.join(path,'encrypted_file.dat')
+
+        if not overwrite:
+            m = 'x'
+        if overwrite:
+            m = 'w'
+
+        with open(file_system_path, m) as self.pub_key_file:
+            self.pub_key_file.write(self.pub_key)
+
+        
+
+# -----------------------------------------------------------------------------------------------------------
+# Functions to assist in generation of prime numbers for usage in the KeyGenerator and block handler classes
 
 # calculate a sieve of primes and return list
 def primeSieve(sieveSize):
@@ -207,7 +241,7 @@ def rabinMiller(n):
         s = s // 2
         t += 1
     for trials in range(5):
-        a = random.randrange(2, n - 1)
+        a = randrange(2, n - 1)
         v = pow(a, s, n)
         if v != 1:
             i = 0
@@ -238,7 +272,7 @@ def isPrime(n):
 def genPrime(s):
     while True:
         # generate random number in range of 2^keysize -1 and 2^keysize
-        n = random.randrange(2**(s-1), 2**(s))
+        n = randrange(2**(s-1), 2**(s))
         if isPrime(n):
             return n
 
@@ -266,6 +300,8 @@ def modInverse(a, m):
         q = u3 // v3
         v1, v2, v3, u1, u2, u3 = (u1 - q * v1), (u2 - q * v2), (u3 - q * v3), v1 ,v2, v3
     return u1 % m 
+# ----------------------------------------------------------------------------------
+
 
 # Helper class creates helper objects to aid in logging and outputting text
 class Helper(_KeyGenerator):
@@ -303,17 +339,17 @@ class Helper(_KeyGenerator):
     pkc.py de -f myfile.txt --pubkey /home/user/pk_pub.dat\n''')
 
     @staticmethod
-    def message_finish_timed(t1, t2):
-        stdout.write('[INFO] Operation finished. Elapsed time ~{} seconds\n'.format(int(t1 - t2)))
+    def measure_time(t1, t2):
+        stdout.write('[Info] Elapsed time ~{} seconds.'.format(int(t2 - t1)))
 
     @staticmethod
     def message_metrics(pub_key, priv_key):
-        stdout.write('[INFO] Public key is size {}\n'.format(pub_key))
-        stdout.write('[INFO] Private key is size {}\n'.format(priv_key))
+        stdout.write('[Info] Public key is size {}'.format(pub_key))
+        stdout.write('[Info] Private key is size {}'.format(priv_key))
         
     @staticmethod
     def message_generate(keysize):
-        stdout.write("[INFO] Generating private and public keys with size {} bits for p and q...\n".format(keysize))
+        stdout.write("[Info] Generating private and public keys with size {} bits for p and q...".format(keysize))
 
 # HelperThread objects are used to spawn and kill threads containing messages and animations
 class HelperThread(Thread):
@@ -374,7 +410,7 @@ class HelperThread(Thread):
             for j in range(msg_len): 
                 out += load_str_list[j]   
 
-            stdout.write("\r"+"[INFO] " + out + " " + animation[animation_count]) 
+            stdout.write("\r"+"[Info] " + out + " " + animation[animation_count]) 
             stdout.flush() 
             load_msg = out 
             animation_count = (animation_count + 1) % 4
@@ -395,22 +431,35 @@ def gen(keysize=1024):
     keys.generate()
     metric_stop = prog()
     try:
-        if namespace.force:
+        if namespace.force and not namespace.print:
             keys.to_file(namespace.output, overwrite=True)
-        elif namespace.print:
+            stdout.write("[Info] Wrote file to path {}\n".format(namespace.output))
+        elif namespace.print and (not namespace.force and namespace.output):
             stdout.write(keys.__str__()+'\n')
-        else:
+        elif not namespace.force:
             keys.to_file(namespace.output)
-    except FileExistsError as file_exists_exept:
-        stderr.write(str(file_exists_exept))
-    except TypeError:
-        stderr.write("[ERROR] Please provide an output path")
+        else:
+            raise Exception("[Err] Generation failed, invalid parameters. Enter 'help' for usage.\n")
+
+    except FileExistsError as file_exists_except:
+        stderr.write(str(file_exists_except)+'\n')
+    except TypeError as type_except:
+        stderr.write(str(type_except)+'\n')
+    except Exception as e:
+        stderr.write(str(e)+'\n')
     finally:
-        Helper.message_finish_timed(metric_start, metric_stop)
+        Helper.measure_time(metric_start, metric_stop)
 
 # Encrypt provided file      
 def en():
-    pass
+    handler = BlockHandler()
+    key = handler.read_key(namespace.pub_key)
+    raw_data = handler.read_file(namespace.input)
+    metric_start = prog()
+    handler.encrypt(raw_data, key, namespace.output)
+    metric_stop = prog()
+    print(handler.cipher_blocks)
+
 
 def de():
     pass
