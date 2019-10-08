@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# Python Implementation of a Public Key Cipher 
+# Jared @ github.com/disastrpc
 
 __author__ = 'Jared'
 __license__ = 'GNU GPL'
@@ -22,10 +24,10 @@ from ctypes import pythonapi, py_object
 # - Keycontainer child class handles random number generation and computation of n e and d through its parent _KeyGenerator.
 #        _comp methods are called by the KeyContainer child class using the generate() method.
 #       All _comp methods should be considered implementation details.
-#
-# _BlockAssembler takes raw data and outputs fixed lenght block sizes. This is handled by the __len__ method. BlockHandler contains encrypt and decrypt methods.
-#       2^keylen > CHARSET^len(integer_block) must hold true.
-# Jared @ github.com/disastrpc
+# - _BlockAssembler takes raw data and outputs fixed lenght block sizes. This is handled by the __len__ method. 
+# - BlockHandler contains encrypt and decrypt methods.
+# 
+# 2^keylen > CHARSET^len(integer_block) must hold true for each raw block.
 
 class _KeyGenerator:
 
@@ -41,7 +43,7 @@ class _KeyGenerator:
         self.e = e
         self.d = d
 
-    # compute n using equation n = p * q
+    # compute n
     def _comp_n(self):
         self.n = self.p * self.q
         return self.n
