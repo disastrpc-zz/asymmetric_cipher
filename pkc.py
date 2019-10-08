@@ -3,14 +3,14 @@
 __author__ = 'Jared'
 __license__ = 'GNU GPL'
 
-import cryutils, argparse, string, os, cryutils, math
+import argparse, string, os, math
 from sys import path, stderr, stdout
 from time import perf_counter as prog
 from time import sleep
 from logging import log
 from threading import Thread
 from tqdm import tqdm as bar
-from random import randrange
+from random import randrange, random
 from pathlib import Path
 from numbers import Integral
 from itertools import cycle
@@ -35,8 +35,8 @@ class _KeyGenerator:
             n=0,e=0,d=0,p=0,q=0):
 
         self.keysize = keysize
-        self.p = cryutils.genPrime(self.keysize)
-        self.q = cryutils.genPrime(self.keysize)
+        self.p = genPrime(self.keysize)
+        self.q = genPrime(self.keysize)
         self.n = n
         self.e = e
         self.d = d
@@ -60,7 +60,7 @@ class _KeyGenerator:
     # Compute d
     # Parameters for the modInverse(a, m) func must be relatively prime.
     def _comp_d(self):
-        self.d = cryutils.modInverse(self.e, (self.p - 1) * (self.q - 1))
+        self.d = modInverse(self.e, (self.p - 1) * (self.q - 1))
         return self.d
 
     # Create KeyGenerator instance and assign keys to instance of object
@@ -174,8 +174,98 @@ class BlockHandler(_BlockAssembler):
             self.cipher_blocks.append(self.cipher_block)
         return self.cipher_blocks
 
+# calculate a sieve of primes and return list
+def primeSieve(sieveSize):
+    sieve = [True] * sieveSize
+    sieve[0] = False
+    sieve[1] = False
+
+    #n > 2 < n^sieveSize + 1
+    for i in range(2, int(math.sqrt(sieveSize)) + 1):
+        pointer = i * 2
+        while pointer < sieveSize:
+            sieve[pointer] = False
+            pointer += 1
+
+    primes = []
+    for i in range(sieveSize):
+        if sieve[i] == True:
+            primes.append(i)
+    return primes
+
+# Rabin Miller primality test Python implementation by Al Sweigart
+def rabinMiller(n):
+    if n % 2 == 0 or n < 2:
+        return False
+    if n == 3:
+        return True
+    s = n - 1
+    t = 0
+    while s % 2 == 0:
+        s = s // 2
+        t += 1
+    for trials in range(5):
+        a = random.randrange(2, n - 1)
+        v = pow(a, s, n)
+        if v != 1:
+            i = 0
+            while v != (n - 1):
+                if i == t - 1:
+                    return False
+                else:
+                    i = i + 1
+                    v = (v ** 2) % n
+    return True
+
+LOW_PRIMES = primeSieve(100)
+
+# func to check if n is prime using lowest 100 prime n
+# resorts to rabinMiller() if not found
+# faster method than trialDiv() for large ints
+def isPrime(n):
+    if (n < 2):
+        return False
+    for prime in LOW_PRIMES:
+        if (n % prime == 0):
+            return False
+    return rabinMiller(n)
+
+# generate primenumber with specified size
+# generated number will be s bits in size
+# s must be supplied
+def genPrime(s):
+    while True:
+        # generate random number in range of 2^keysize -1 and 2^keysize
+        n = random.randrange(2**(s-1), 2**(s))
+        if isPrime(n):
+            return n
+
+# return true if n is prime using trial division algorithm
+def trialDiv(n):
+    # 1 is not prime
+    if n < 2:
+        return False
+    # for every n > 2 < n^2 + 1 
+    for i in range(2, int(math.sqrt(n)) + 1):
+        #if modulo is 0 n is not prime
+        if n % i == 0:
+            return False
+    # otherwise n is prime
+    return True
+
+# mod inverse Python implementation by Al Sweigart
+# using the extended Eucledian algorithm
+def modInverse(a, m):
+    if math.gcd(a, m) != 1:
+        return None
+    u1, u2, u3 = 1, 0, a
+    v1, v2, v3 = 0, 1, m
+    while v3 != 0:
+        q = u3 // v3
+        v1, v2, v3, u1, u2, u3 = (u1 - q * v1), (u2 - q * v2), (u3 - q * v3), v1 ,v2, v3
+    return u1 % m 
+
 # Helper class creates helper objects to aid in logging and outputting text
-# Contains help
 class Helper(_KeyGenerator):
 
     @staticmethod
@@ -208,22 +298,22 @@ class Helper(_KeyGenerator):
     Examples:
     pkc.py gen -l 2048 -o /home/user
     pkc.py en --privkey /root/pk_priv.dat -f myfile.txt
-    pkc.py de -f myfile.txt --pubkey /home/user/pk_pub.dat''')
+    pkc.py de -f myfile.txt --pubkey /home/user/pk_pub.dat\n''')
 
     @staticmethod
     def message_finish_timed(t1, t2):
-        stdout.write('[INFO] Operation finished. Elapsed time ~{} seconds'.format(int(t1 - t2))+'\n')
+        stdout.write('[INFO] Operation finished. Elapsed time ~{} seconds\n'.format(int(t1 - t2)))
 
     @staticmethod
     def message_metrics(pub_key, priv_key):
-        stdout.write('[INFO] Public key is size {} \n'.format(pub_key))
-        stdout.write('[INFO] Private key is size {} \n'.format(priv_key))
+        stdout.write('[INFO] Public key is size {}\n'.format(pub_key))
+        stdout.write('[INFO] Private key is size {}\n'.format(priv_key))
         
     @staticmethod
     def message_generate(keysize):
-        stdout.write("[INFO] Generating private and public keys with size {} bits for p and q...".format(keysize)+'\n')
+        stdout.write("[INFO] Generating private and public keys with size {} bits for p and q...\n".format(keysize))
 
-
+# HelperThread objects are used to spawn and kill threads containing messages and animations
 class HelperThread(Thread):
 
     def __init__(self,name,msg,inter=0.065):
@@ -231,9 +321,6 @@ class HelperThread(Thread):
         self.name = name
         self.msg = msg
         self.inter = inter
-
-    def __repr__(self):
-        return '{self.__class__.__name__}({self.name}, {self.msg}, {self.inter})'.format(self=self)
     
     # load specified animation set
     def run(self):
@@ -264,10 +351,11 @@ class HelperThread(Thread):
         msg_len = len(load_msg) 
         i, count_time, animation_count = 0,0,0  
         load_str_list = list(load_msg)   
-        y = 0                  
+        y = 0     
         while True: 
+
             # controls animation speed. can be provided to the class instance as inter=int
-            time.sleep(inter)   
+            sleep(inter)   
 
             # get ASCII
             x = ord(load_str_list[i])            
@@ -295,6 +383,10 @@ class HelperThread(Thread):
                 print('\n')
                 break
 
+# Main functions
+# These are called by the parser object whenever certain args are provided
+
+# Key generation
 def gen(keysize=1024):
     keys = KeyContainer(keysize)
     metric_start = prog()
@@ -313,24 +405,26 @@ def gen(keysize=1024):
         stderr.write("[ERROR] Please provide an output path")
     finally:
         Helper.message_finish_timed(metric_start, metric_stop)
-            
+
+# Encrypt provided file      
 def en():
     pass
 
 def de():
     pass
 
-SWITCHER = {
+INIT = {
     'help': Helper.show_help,
     'gen': gen,
     'en': en,
     'de': de
 }
+
 # def parse():
 parser = argparse.ArgumentParser(add_help=False)
 
 # mode args
-parser.add_argument(dest='mode',choices=SWITCHER.keys())
+parser.add_argument(dest='mode',choices=INIT.keys())
 
 # gen mode
 parser.add_argument('-l','--lenght',default=1024,type=int,dest='keysize')
@@ -343,7 +437,5 @@ parser.add_argument('-f','--file',dest='input')
 parser.add_argument('--privatekey',dest='priv_key')
 parser.add_argument('--publickey',dest='pub_key')
 namespace = parser.parse_args()
-
-      
-           
-SWITCHER[namespace.mode]()
+         
+INIT[namespace.mode]()
