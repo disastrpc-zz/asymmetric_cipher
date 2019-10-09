@@ -5,7 +5,7 @@
 __author__ = 'Jared'
 __license__ = 'GNU GPL'
 
-import argparse, string, os, math
+import argparse, string, os, math, re
 from sys import path, stderr, stdout
 from time import perf_counter as prog
 from time import sleep
@@ -45,18 +45,22 @@ class _KeyGenerator:
 
     # compute n
     def _comp_n(self):
+        stdout.write("[Info] Computing n...")
         self.n = self.p * self.q
+        stdout.write(" Done\n")
         return self.n
     
     # Compute e
     # e must be relatively prime to p*q which is calculated using
     # the equation e = (p - 1) * (q - 1)
     def _comp_e(self):
+        stdout.write("[Info] Computing n...")
         while True:  
             # while true try number    
             self.e = randrange(2 ** (self.keysize - 1), 2 ** (self.keysize))
             # Check numbers are relative primes
             if(math.gcd(self.e,(self.p - 1) * (self.q - 1))==1):
+                stdout.write(" Done\n")
                 return self.e
 
     # Compute d
@@ -106,6 +110,10 @@ class KeyContainer(_KeyGenerator):
             self.priv_key = str(self.n)+":"+str(self.d)
             self.priv_key_file.write(self.priv_key)
 
+# ----------------------------------------------------------------------------------------------
+# Block assembler class takes raw data and transforms it into integer blocks of a fixed lenght. 
+# Lenght is determined by the equation in the __len__ method and most hold true for every block.
+# 2^keysize > lenght of charset^block size
 class _BlockAssembler:
 
     # Will throw error if data contains text outside charset
@@ -128,7 +136,9 @@ class _BlockAssembler:
     # Assemble raw block and return as string
     def _assemble_raw_block(self, raw_data):
         self.exp=0
-        for i in raw_data:
+        pbar = bar(raw_data)
+        pbar.set_description("[Info] Assembling raw data")
+        for i in pbar:
             # For index location in character multiply by the len of the charset and an incrementing exponent
             self.raw_integer_block += __class__().CHARSET.index(i) * (pow(len(__class__().CHARSET),self.exp))
             self.exp+=1      
@@ -167,43 +177,49 @@ class BlockHandler(_BlockAssembler):
     @staticmethod    
     def split_key(key):
         return key.split(":")
-
-    @staticmethod
-    def read_key(path):
-        key_file = open(path, 'r')
-        key = key_file.read()
-        key_file.close()
-        return key
     
     @staticmethod
-    def read_file(path):
+    def read_content(path):
         content = open(path, 'r')
+        stdout.write(f"[Info] Reading content {path}...")
         data = content.read()
+        stdout.write(" Done\n")
         content.close()
         return data
        
     def encrypt(self, raw_data, pub_key, output):
         self.pub_key = self.split_key(pub_key)
+        stdout.write("[Info] Formatting blocks...")
         self.blocks = super()._get_formatted_blocks(raw_data)
-        for block in bar(self.blocks):
+        stdout.write(" Done\n")
+        pbar = bar(self.blocks)
+        for block in pbar:
+            pbar.set_description("[Info] Encrypting blocks")
             self.cipher_block = pow(int(block), int(self.pub_key[1]), int(self.pub_key[0]))
             self.cipher_blocks.append(self.cipher_block)
+        stdout.write(" Done\n")
         return self.cipher_blocks
 
-    def decrypt(self, cipher_blocks, priv_key, output):
+    def decrypt(self, cipher_data, priv_key, output):
         self.priv_key = self.split_key(priv_key)
+        self.cipher_blocks = self.read_content(cipher_data)
+        self.cipher_blocks += cipher_data.split(',')
+        print(self.cipher_blocks)
+
 
     def to_file(self, path, overwrite=False):
 
-        file_system_path = os.path.join(path,'encrypted_file.dat')
+        file_system_path = Path(fr'{path}')
 
         if not overwrite:
             m = 'x'
         if overwrite:
             m = 'w'
-
-        with open(file_system_path, m) as self.pub_key_file:
-            self.pub_key_file.write(self.pub_key)
+        
+        with open(file_system_path, m) as self.cipher_file:
+            self.string_cipher_blocks = ','.join(str(i) for i in self.cipher_blocks)
+            # self.string_cipher_blocks = re.sub(',','', self.string_cipher_blocks)
+            self.cipher_file.write(self.string_cipher_blocks)
 
         
 
@@ -426,8 +442,8 @@ class HelperThread(Thread):
 
 # Key generation
 def gen(keysize=1024):
-    keys = KeyContainer(keysize)
     metric_start = prog()
+    keys = KeyContainer(keysize)
     keys.generate()
     metric_stop = prog()
     try:
@@ -452,17 +468,22 @@ def gen(keysize=1024):
 
 # Encrypt provided file      
 def en():
-    handler = BlockHandler()
-    key = handler.read_key(namespace.pub_key)
-    raw_data = handler.read_file(namespace.input)
     metric_start = prog()
+    handler = BlockHandler()
+    key = handler.read_content(namespace.pub_key)
+    raw_data = handler.read_content(namespace.input)
     handler.encrypt(raw_data, key, namespace.output)
     metric_stop = prog()
-    print(handler.cipher_blocks)
+    handler.to_file(namespace.output)
 
 
 def de():
-    pass
+    handler = BlockHandler()
+    cipher_data = handler.read_content(namespace.input)
+    key = handler.read_content(namespace.priv_key)
+    handler.decrypt(cipher_data, key, namespace.output)
+    handler.to_file(namespace.output)
+
 
 INIT = {
     'help': Helper.show_help,
