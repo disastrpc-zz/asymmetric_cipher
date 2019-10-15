@@ -45,22 +45,18 @@ class _KeyGenerator:
 
     # compute n
     def _comp_n(self):
-        stdout.write("[Info] Computing n...")
         self.n = self.p * self.q
-        stdout.write(" Done\n")
         return self.n
     
     # Compute e
     # e must be relatively prime to p*q which is calculated using
     # the equation e = (p - 1) * (q - 1)
     def _comp_e(self):
-        stdout.write("[Info] Computing n...")
         while True:  
             # while true try number    
             self.e = randrange(2 ** (self.keysize - 1), 2 ** (self.keysize))
             # Check numbers are relative primes
             if(math.gcd(self.e,(self.p - 1) * (self.q - 1))==1):
-                stdout.write(" Done\n")
                 return self.e
 
     # Compute d
@@ -95,8 +91,8 @@ class KeyContainer(_KeyGenerator):
 
     def to_file(self, path, overwrite=False):
 
-        pub_system_path = os.path.join(path,'pk_pub.dat')
-        priv_system_path = os.path.join(path,'pk_priv.dat')
+        pub_system_path = os.path.join(path,'pub_key.dat')
+        priv_system_path = os.path.join(path,'priv_key.dat')
 
         if not overwrite:
             m = 'x'
@@ -136,13 +132,24 @@ class _BlockAssembler:
     # Assemble raw block and return as string
     def _assemble_raw_block(self, raw_data):
         self.exp=0
-        pbar = bar(raw_data)
-        pbar.set_description("[Info] Assembling raw data")
-        for i in pbar:
+        prog = bar(raw_data)
+        prog.set_description("[Info] Assembling raw data")
+        for i in prog:
             # For index location in character multiply by the len of the charset and an incrementing exponent
             self.raw_integer_block += __class__().CHARSET.index(i) * (pow(len(__class__().CHARSET),self.exp))
-            self.exp+=1      
+            self.exp+=1 
         return str(self.raw_integer_block)
+
+    def _dissasemble_raw_blocks(self, integer_block):
+        self.exp=0
+        prog = bar(integer_block)
+        prog.set_description("[Info] Dissasembling integer block")
+        for block in prog:
+            i = block // (len(__class__().CHARSET) ** self.exp)
+            print(i)
+            self.raw_data = __class__().CHARSET[i]
+            self.exp+=1
+        return str(self.raw_data)
 
     # Call __len__ to get the maximum block size
     def _get_block_size(self):
@@ -165,6 +172,7 @@ class BlockHandler(_BlockAssembler):
                 raw_integer_block=0,
                 block_size=0,
                 cipher_blocks=[],
+                plain_integer_blocks=[],
                 plain_text_blocks=''):
         _BlockAssembler.__init__(self)
         self.pub_key = pub_key
@@ -172,6 +180,7 @@ class BlockHandler(_BlockAssembler):
         self.raw_integer_block = raw_integer_block.__class__()
         self.block_size = block_size.__class__()
         self.cipher_blocks = cipher_blocks
+        self.plain_integer_blocks = plain_integer_blocks
         self.plain_text_blocks = plain_text_blocks
 
     @staticmethod    
@@ -183,7 +192,7 @@ class BlockHandler(_BlockAssembler):
         content = open(path, 'r')
         stdout.write(f"[Info] Reading content {path}...")
         data = content.read()
-        stdout.write(" Done\n")
+        stdout.write("[Info] Done\n")
         content.close()
         return data
        
@@ -191,21 +200,26 @@ class BlockHandler(_BlockAssembler):
         self.pub_key = self.split_key(pub_key)
         stdout.write("[Info] Formatting blocks...")
         self.blocks = super()._get_formatted_blocks(raw_data)
-        stdout.write(" Done\n")
+        stdout.write("[Info] Done\n")
         pbar = bar(self.blocks)
+        pbar.set_description("[Info] Encrypting blocks")
         for block in pbar:
-            pbar.set_description("[Info] Encrypting blocks")
             self.cipher_block = pow(int(block), int(self.pub_key[1]), int(self.pub_key[0]))
             self.cipher_blocks.append(self.cipher_block)
-        stdout.write(" Done\n")
+        stdout.write("[Info] Done\n")
         return self.cipher_blocks
 
     def decrypt(self, cipher_data, priv_key, output):
         self.priv_key = self.split_key(priv_key)
-        self.cipher_blocks = self.read_content(cipher_data)
         self.cipher_blocks += cipher_data.split(',')
-        print(self.cipher_blocks)
+        pbar = bar(self.cipher_blocks)
+        pbar.set_description("[Info] Decrypting blocks")
+        for block in pbar:
+            self.plain_block = pow(int(block), int(self.priv_key[1]), int(self.priv_key[0]))
+            self.plain_integer_blocks.append(self.plain_block)
 
+        self.raw_data = super()._dissasemble_raw_blocks(self.plain_integer_blocks)
+        return self.raw_data
 
     def to_file(self, path, overwrite=False):
 
@@ -220,6 +234,12 @@ class BlockHandler(_BlockAssembler):
             self.string_cipher_blocks = ','.join(str(i) for i in self.cipher_blocks)
             # self.string_cipher_blocks = re.sub(',','', self.string_cipher_blocks)
             self.cipher_file.write(self.string_cipher_blocks)
+
+    # def to_plain_text_file(self, path, raw_data):
+    #     file_system_path = Path(fr'{path}')
+
+    #     with open(file_system_path, 'x') as self.plain_text_file:
+    #         self.
 
         
 
@@ -334,20 +354,22 @@ class Helper(_KeyGenerator):
 
     Key generator
     gen
-        -l --lenght - specify keylen, if none default of 1024 bits is used
-        -o --output - output path
-        --force     - overwrite existing key file
-        --print     - print keys to screen
+        -l --lenght     - specify keylen, if none default of 1024 bits is used
+        -o --output     - output path
+        --force         - overwrite existing key file
+        --print         - print keys to screen
 
     Encrypter
     en
-        --privkey   - specify path to private key
-        -f --file   - specify path to file
+        --publickey     - specify path to public key
+        -f --file       - specify path to file
+        -o, --output    - specify output path
 
     Decrypter
     de
-        --pubkey    - specify path to public key
-        -f --file   - specify path to file
+        --privatekey    - specify path to private key
+        -f --file       - specify path to file
+        -o, --output    - specify output path
 
     Examples:
     pkc.py gen -l 2048 -o /home/user
@@ -445,15 +467,16 @@ def gen(keysize=1024):
     metric_start = prog()
     keys = KeyContainer(keysize)
     keys.generate()
-    metric_stop = prog()
     try:
         if namespace.force and not namespace.print:
             keys.to_file(namespace.output, overwrite=True)
             stdout.write("[Info] Wrote file to path {}\n".format(namespace.output))
         elif namespace.print and (not namespace.force and namespace.output):
+            stdout.write("[Info] Printing key..."+'\n')
             stdout.write(keys.__str__()+'\n')
         elif not namespace.force:
             keys.to_file(namespace.output)
+            stdout.write("[Info] Wrote file to path {}\n".format(namespace.output))
         else:
             raise Exception("[Err] Generation failed, invalid parameters. Enter 'help' for usage.\n")
 
@@ -464,25 +487,49 @@ def gen(keysize=1024):
     except Exception as e:
         stderr.write(str(e)+'\n')
     finally:
+        metric_stop = prog()
         Helper.measure_time(metric_start, metric_stop)
 
 # Encrypt provided file      
 def en():
-    metric_start = prog()
-    handler = BlockHandler()
-    key = handler.read_content(namespace.pub_key)
-    raw_data = handler.read_content(namespace.input)
-    handler.encrypt(raw_data, key, namespace.output)
-    metric_stop = prog()
-    handler.to_file(namespace.output)
+    try:
+        metric_start = prog()
+        handler = BlockHandler()
+        key = handler.read_content(namespace.pub_key)
+        raw_data = handler.read_content(namespace.input)
+        handler.encrypt(raw_data, key, namespace.output)
+        metric_stop = prog()
+        handler.to_file(namespace.output)
+
+    except FileExistsError as file_exists_except:
+        stderr.write(str(file_exists_except)+'\n')
+    except TypeError as type_except:
+        stderr.write(str(type_except)+'\n')
+    except Exception as e:
+        stderr.write(str(e)+'\n')
+    finally:
+        Helper.measure_time(metric_start, metric_stop)
 
 
 def de():
+    # try:
+    metric_start = prog()
     handler = BlockHandler()
     cipher_data = handler.read_content(namespace.input)
     key = handler.read_content(namespace.priv_key)
     handler.decrypt(cipher_data, key, namespace.output)
-    handler.to_file(namespace.output)
+    # handler.to_file(namespace.output)
+    print(handler.raw_data)
+    metric_stop = prog()
+
+    # except FileExistsError as file_exists_except:
+    #     stderr.write(str(file_exists_except)+'\n')
+    # except TypeError as type_except:
+    #     stderr.write(str(type_except)+'\n')
+    # except Exception as e:
+    #     stderr.write(str(e)+'\n')
+    # finally:
+    #     Helper.measure_time(metric_start, metric_stop)
 
 
 INIT = {
