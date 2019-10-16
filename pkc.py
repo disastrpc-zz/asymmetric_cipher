@@ -138,18 +138,25 @@ class _BlockAssembler:
             # For index location in character multiply by the len of the charset and an incrementing exponent
             self.raw_integer_block += __class__().CHARSET.index(i) * (pow(len(__class__().CHARSET),self.exp))
             self.exp+=1 
+        print("raw block: " + str(self.raw_integer_block))
         return str(self.raw_integer_block)
 
-    def _dissasemble_raw_blocks(self, integer_block):
-        self.exp=0
-        prog = bar(integer_block)
+    def _disassemble_raw_blocks(self, msg_len, block_size, integer_blocks):
+        prog = bar(integer_blocks)
         prog.set_description("[Info] Dissasembling integer block")
+        msg_len = int(msg_len)
+        message = []
         for block in prog:
-            i = block // (len(__class__().CHARSET) ** self.exp)
-            print(i)
-            self.raw_data = __class__().CHARSET[i]
-            self.exp+=1
-        return str(self.raw_data)
+            block_message = []
+            for i in range(block_size - 1, -1, -1):
+                if len(message) + i < msg_len:
+                    char_index = block // (len(__class__().CHARSET) ** i)
+                    block = block % (len(__class__().CHARSET) ** i)
+                    block_message.insert(0, __class__().CHARSET[char_index])
+            message.extend(block_message)
+        return ''.join(message)
+        
+
 
     # Call __len__ to get the maximum block size
     def _get_block_size(self):
@@ -163,20 +170,20 @@ class _BlockAssembler:
         self.raw_block, self.block_size = self._assemble_raw_block(raw_data), (self._get_block_size() - 1)
         return [self.raw_block[i:i + self.block_size] for i in range(0, len(self.raw_block), self.block_size)]
 
+    def _get_formatted_cipher_blocks(self, cipher_data, block_size):
+        return(cipher_data[0+i:block_size+i] for i in range(0, len(cipher_data), block_size))
+
+
 # BlockHandler holds encrypt and decrypt methods
 class BlockHandler(_BlockAssembler):
 
     def __init__(self,
-                pub_key=0, 
-                priv_key=0,
                 raw_integer_block=0,
                 block_size=0,
                 cipher_blocks=[],
                 plain_integer_blocks=[],
                 plain_text_blocks=''):
         _BlockAssembler.__init__(self)
-        self.pub_key = pub_key
-        self.priv_key = priv_key
         self.raw_integer_block = raw_integer_block.__class__()
         self.block_size = block_size.__class__()
         self.cipher_blocks = cipher_blocks
@@ -197,31 +204,37 @@ class BlockHandler(_BlockAssembler):
         return data
        
     def encrypt(self, raw_data, pub_key, output):
+
+        self.raw_data = raw_data
+
         self.pub_key = self.split_key(pub_key)
         stdout.write("[Info] Formatting blocks...")
-        self.blocks = super()._get_formatted_blocks(raw_data)
+        self.blocks = super()._get_formatted_blocks(str(self.raw_data))
         stdout.write("[Info] Done\n")
-        pbar = bar(self.blocks)
-        pbar.set_description("[Info] Encrypting blocks")
-        for block in pbar:
+        prog = bar(self.blocks)
+        prog.set_description("[Info] Encrypting blocks")
+        for block in prog:
             self.cipher_block = pow(int(block), int(self.pub_key[1]), int(self.pub_key[0]))
             self.cipher_blocks.append(self.cipher_block)
         stdout.write("[Info] Done\n")
+        print("ciph: " + str(self.cipher_blocks))
         return self.cipher_blocks
 
-    def decrypt(self, cipher_data, priv_key, output):
+    def decrypt(self, cipher_data, priv_key, output):     
+        self.buf = cipher_data.split('|')
+        print(buf)
+        self.msg_len, self.block_size, self.cipher_data = int(self.buf[0]), int(self.buf[1]), int(self.buf[2])
+        self.cipher_blocks = list(super()._get_formatted_cipher_blocks(self.cipher_data, self.block_size))
         self.priv_key = self.split_key(priv_key)
-        self.cipher_blocks += cipher_data.split(',')
-        pbar = bar(self.cipher_blocks)
-        pbar.set_description("[Info] Decrypting blocks")
-        for block in pbar:
+        prog = bar(self.cipher_blocks)
+        prog.set_description("[Info] Decrypting blocks")
+        for block in prog:
             self.plain_block = pow(int(block), int(self.priv_key[1]), int(self.priv_key[0]))
             self.plain_integer_blocks.append(self.plain_block)
+        self.plain_text = super()._disassemble_raw_blocks(self.msg_len, int(self.block_size), self.plain_integer_blocks)
+        return self.plain_text
 
-        self.raw_data = super()._dissasemble_raw_blocks(self.plain_integer_blocks)
-        return self.raw_data
-
-    def to_file(self, path, overwrite=False):
+    def to_encrypted_file(self, path, overwrite=False):
 
         file_system_path = Path(fr'{path}')
 
@@ -233,7 +246,7 @@ class BlockHandler(_BlockAssembler):
         with open(file_system_path, m) as self.cipher_file:
             self.string_cipher_blocks = ','.join(str(i) for i in self.cipher_blocks)
             # self.string_cipher_blocks = re.sub(',','', self.string_cipher_blocks)
-            self.cipher_file.write(self.string_cipher_blocks)
+            self.cipher_file.write("{}|{}|{}".format(len(self.raw_data), self.block_size, self.string_cipher_blocks))
 
     # def to_plain_text_file(self, path, raw_data):
     #     file_system_path = Path(fr'{path}')
@@ -389,83 +402,13 @@ class Helper(_KeyGenerator):
     def message_generate(keysize):
         stdout.write("[Info] Generating private and public keys with size {} bits for p and q...".format(keysize))
 
-# HelperThread objects are used to spawn and kill threads containing messages and animations
-class HelperThread(Thread):
-
-    def __init__(self,name,msg,inter=0.065):
-        Thread.__init__(self)
-        self.name = name
-        self.msg = msg
-        self.inter = inter
-    
-    # load specified animation set
-    def run(self):
-        try:
-            while True:
-                __class__.load_animation(self.msg, self.inter)
-        finally:
-            __class__.load_animation(self.msg,self.inter,run=False)
-
-    # get id for each tread
-    def get_id(self): 
-        for id, thread in Thread._active.items(): 
-            if thread is self: 
-                return id
-
-    # exits the interpreter 'gracefully' when called
-    def kill(self):
-        thread_id = self.get_id() 
-        res = pythonapi.PyThreadState_SetAsyncExc(thread_id, py_object(SystemExit)) 
-        if res > 1: 
-            pythonapi.PyThreadState_SetAsyncExc(thread_id, 0) 
-
-    @staticmethod
-    def load_animation(msg, inter, run=True):
-
-        # unpack vars
-        load_msg, animation = msg, "|/-\\"   
-        msg_len = len(load_msg) 
-        i, count_time, animation_count = 0,0,0  
-        load_str_list = list(load_msg)   
-        y = 0     
-        while True: 
-
-            # controls animation speed. can be provided to the class instance as inter=int
-            sleep(inter)   
-
-            # get ASCII
-            x = ord(load_str_list[i])            
-            y = 0                             
-            if x != 32 and x != 46:              
-                if x>90: 
-                    y = x-32
-                else: 
-                    y = x + 32
-                load_str_list[i]= chr(y) 
-
-            # to s
-            out = ''
-            for j in range(msg_len): 
-                out += load_str_list[j]   
-
-            stdout.write("\r"+"[Info] " + out + " " + animation[animation_count]) 
-            stdout.flush() 
-            load_msg = out 
-            animation_count = (animation_count + 1) % 4
-            i = (i + 1) % msg_len 
-            count_time += 1
-
-            if not run:
-                print('\n')
-                break
-
 # Main functions
 # These are called by the parser object whenever certain args are provided
 
 # Key generation
 def gen(keysize=1024):
     metric_start = prog()
-    keys = KeyContainer(keysize)
+    keys = KeyContainer(namespace.keysize)
     keys.generate()
     try:
         if namespace.force and not namespace.print:
@@ -499,7 +442,7 @@ def en():
         raw_data = handler.read_content(namespace.input)
         handler.encrypt(raw_data, key, namespace.output)
         metric_stop = prog()
-        handler.to_file(namespace.output)
+        handler.to_encrypted_file(namespace.output)
 
     except FileExistsError as file_exists_except:
         stderr.write(str(file_exists_except)+'\n')
@@ -517,9 +460,10 @@ def de():
     handler = BlockHandler()
     cipher_data = handler.read_content(namespace.input)
     key = handler.read_content(namespace.priv_key)
+    print(key)
     handler.decrypt(cipher_data, key, namespace.output)
     # handler.to_file(namespace.output)
-    print(handler.raw_data)
+    print("raw data: " + handler.plain_text)
     metric_stop = prog()
 
     # except FileExistsError as file_exists_except:
