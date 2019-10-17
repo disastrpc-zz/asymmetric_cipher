@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Python Implementation of a Public Key Cipher 
 # Jared @ github.com/disastrpc
 
@@ -7,6 +7,7 @@ __license__ = 'GNU GPL'
 
 import argparse, string, os, math, re
 from sys import path, stderr, stdout
+from numpy import array
 from time import perf_counter as prog
 from time import sleep
 from logging import log
@@ -113,7 +114,12 @@ class KeyContainer(_KeyGenerator):
 class _BlockAssembler:
 
     # Will throw error if data contains text outside charset
-    CHARSET = string.ascii_letters+string.digits+"@#$%^&*()<>-=,.?:;[]/!\\`\'\""+string.whitespace
+    CHARSET_DATA = string.ascii_letters+string.digits+"@#$%^&*()<>-=,.?:;[]/!\\`\'\" "
+    CHARSET = []
+    for i in CHARSET_DATA:
+        CHARSET.append(i)
+    CHARSET.append('\n')
+    CHARSET.append('\r')
 
     def __init__(self, keysize=1024, integer_block=0, block_size=0, raw_integer_block=0, assembled_blocks=0):
         self.keysize = keysize
@@ -136,14 +142,15 @@ class _BlockAssembler:
         prog.set_description("[Info] Assembling raw data")
         for i in prog:
             # For index location in character multiply by the len of the charset and an incrementing exponent
+            print(i)
             self.raw_integer_block += __class__().CHARSET.index(i) * (pow(len(__class__().CHARSET),self.exp))
             self.exp+=1 
-        print("raw block: " + str(self.raw_integer_block))
+        # print("raw block: " + str(self.raw_integer_block))
         return str(self.raw_integer_block)
 
     def _disassemble_raw_blocks(self, msg_len, block_size, integer_blocks):
         prog = bar(integer_blocks)
-        prog.set_description("[Info] Dissasembling integer block")
+        prog.set_description("[Info] Disassembling integer block")
         msg_len = int(msg_len)
         message = []
         for block in prog:
@@ -151,6 +158,7 @@ class _BlockAssembler:
             for i in range(block_size - 1, -1, -1):
                 if len(message) + i < msg_len:
                     char_index = block // (len(__class__().CHARSET) ** i)
+                    print("char index: " + str(char_index))
                     block = block % (len(__class__().CHARSET) ** i)
                     block_message.insert(0, __class__().CHARSET[char_index])
             message.extend(block_message)
@@ -171,7 +179,7 @@ class _BlockAssembler:
         return [self.raw_block[i:i + self.block_size] for i in range(0, len(self.raw_block), self.block_size)]
 
     def _get_formatted_cipher_blocks(self, cipher_data, block_size):
-        return(cipher_data[0+i:block_size+i] for i in range(0, len(cipher_data), block_size))
+        return (cipher_data[0+i:block_size+i] for i in range(0, len(str(cipher_data)), block_size))
 
 
 # BlockHandler holds encrypt and decrypt methods
@@ -217,14 +225,15 @@ class BlockHandler(_BlockAssembler):
             self.cipher_block = pow(int(block), int(self.pub_key[1]), int(self.pub_key[0]))
             self.cipher_blocks.append(self.cipher_block)
         stdout.write("[Info] Done\n")
-        print("ciph: " + str(self.cipher_blocks))
+        # print("ciph: " + str(self.cipher_blocks))
         return self.cipher_blocks
 
     def decrypt(self, cipher_data, priv_key, output):     
         self.buf = cipher_data.split('|')
-        print(buf)
-        self.msg_len, self.block_size, self.cipher_data = int(self.buf[0]), int(self.buf[1]), int(self.buf[2])
+        self.msg_len, self.block_size, self.cipher_data = int(self.buf[0]), int(self.buf[1]), self.buf[2]
+        self.cipher_data = self.cipher_data.replace(',','')
         self.cipher_blocks = list(super()._get_formatted_cipher_blocks(self.cipher_data, self.block_size))
+        # print(self.cipher_blocks)
         self.priv_key = self.split_key(priv_key)
         prog = bar(self.cipher_blocks)
         prog.set_description("[Info] Decrypting blocks")
@@ -248,11 +257,11 @@ class BlockHandler(_BlockAssembler):
             # self.string_cipher_blocks = re.sub(',','', self.string_cipher_blocks)
             self.cipher_file.write("{}|{}|{}".format(len(self.raw_data), self.block_size, self.string_cipher_blocks))
 
-    # def to_plain_text_file(self, path, raw_data):
-    #     file_system_path = Path(fr'{path}')
+    def to_plain_text_file(self, path, data):
+        file_system_path = Path(fr'{path}')
 
-    #     with open(file_system_path, 'x') as self.plain_text_file:
-    #         self.
+        with open(file_system_path, 'x') as self.plain_text_file:
+            self.plain_text_file.write(data)
 
         
 
@@ -404,7 +413,7 @@ class Helper(_KeyGenerator):
 
 # Main functions
 # These are called by the parser object whenever certain args are provided
-
+handler = BlockHandler()
 # Key generation
 def gen(keysize=1024):
     metric_start = prog()
@@ -435,35 +444,32 @@ def gen(keysize=1024):
 
 # Encrypt provided file      
 def en():
-    try:
-        metric_start = prog()
-        handler = BlockHandler()
-        key = handler.read_content(namespace.pub_key)
-        raw_data = handler.read_content(namespace.input)
-        handler.encrypt(raw_data, key, namespace.output)
-        metric_stop = prog()
-        handler.to_encrypted_file(namespace.output)
+    # try:
+    metric_start = prog()
+    key = handler.read_content(namespace.pub_key)
+    raw_data = handler.read_content(namespace.input)
+    handler.encrypt(raw_data, key, namespace.output)
+    handler.to_encrypted_file(namespace.output)
 
-    except FileExistsError as file_exists_except:
-        stderr.write(str(file_exists_except)+'\n')
-    except TypeError as type_except:
-        stderr.write(str(type_except)+'\n')
-    except Exception as e:
-        stderr.write(str(e)+'\n')
-    finally:
-        Helper.measure_time(metric_start, metric_stop)
+    # except FileExistsError as file_exists_except:
+    #     stderr.write(str(file_exists_except)+'\n')
+    # except TypeError as type_except:
+    #     stderr.write(str(type_except)+'\n')
+    # except Exception as e:
+    #     stderr.write(str(e)+'\n')
+    # finally:
+    #     metric_stop = prog()
+    #     Helper.measure_time(metric_start, metric_stop)
 
 
 def de():
     # try:
     metric_start = prog()
-    handler = BlockHandler()
     cipher_data = handler.read_content(namespace.input)
     key = handler.read_content(namespace.priv_key)
-    print(key)
-    handler.decrypt(cipher_data, key, namespace.output)
-    # handler.to_file(namespace.output)
-    print("raw data: " + handler.plain_text)
+    plain_text = handler.decrypt(cipher_data, key, namespace.output)
+    handler.to_plain_text_file(namespace.output, plain_text)
+
     metric_stop = prog()
 
     # except FileExistsError as file_exists_except:
