@@ -19,24 +19,13 @@ from numbers import Integral
 from itertools import cycle
 from ctypes import pythonapi, py_object
 
-# Data churner classes
-#
-# Generate keys, digest raw or encrypted data and output results
-# - Keycontainer child class handles random number generation and computation of n e and d through its parent _KeyGenerator.
-#        _comp methods are called by the KeyContainer child class using the generate() method.
-#       All _comp methods should be considered implementation details.
-# - _BlockAssembler takes raw data and outputs fixed lenght block sizes. This is handled by the __len__ method. 
-# - BlockHandler contains encrypt and decrypt methods.
-# 
-# 2^keylen > CHARSET^len(integer_block) must hold true for each raw block.
-
-class _KeyGenerator:
+# Key container class holds all parts of the key pairs, as well as keysize
+class _KeyContainer:
 
     def __init__(
             self,
             keysize,
             n=0,e=0,d=0,p=0,q=0):
-
         self.keysize = keysize
         self.p = genPrime(self.keysize)
         self.q = genPrime(self.keysize)
@@ -44,6 +33,39 @@ class _KeyGenerator:
         self.e = e
         self.d = d
 
+    # print formatted keys
+    def __str__(self):
+        return "Public key: "+str(self.n)+str(self.e)+'\n'+"Private key: "+str(self.n)+str(self.d)
+
+    # Writes keys to provided path
+    def to_file(self, path, overwrite=False):
+
+        pub_system_path = os.path.join(path,'pub_key.dat')
+        priv_system_path = os.path.join(path,'priv_key.dat')
+
+        # Used by the --force parameter
+        if not overwrite:
+            m = 'x'
+        if overwrite:
+            m = 'w'
+
+        with open(pub_system_path, m) as self.pub_key_file:
+            self.pub_key = str(self.n)+":"+str(self.e)
+            self.pub_key_file.write(self.pub_key)
+        with open(priv_system_path, m) as self.priv_key_file:
+            self.priv_key = str(self.n)+":"+str(self.d)
+            self.priv_key_file.write(self.priv_key)
+
+# KeyGenerator stores and formats private and public keys
+# The generate method handles the computations and stores them in the _KeyContainer class
+class KeyGenerator(_KeyContainer):
+    
+    def __init__(self, keysize):
+        _KeyContainer.__init__(self, keysize)
+
+    def __len__(self, *args):
+        for arg in args:
+            return len(str(arg))
     # compute n
     def _comp_n(self):
         self.n = self.p * self.q
@@ -66,46 +88,12 @@ class _KeyGenerator:
         self.d = modInverse(self.e, (self.p - 1) * (self.q - 1))
         return self.d
 
-    # Create KeyGenerator instance and assign keys to instance of object
+    # Calls to all _comp methods to generate key pairs
     def generate(self):
-        self.gen = _KeyGenerator(self.keysize)
-        self.n = self.gen._comp_n()
-        self.e = self.gen._comp_e()
-        self.d = self.gen._comp_d()
+        self.n = self._comp_n()
+        self.e = self._comp_e()
+        self.d = self._comp_d()
         return self.n, self.e, self.d
-
-# KeyContainer generates and formats private and public keys for display and storage
-class KeyContainer(_KeyGenerator):
-    
-    def __init__(self, keysize, priv_key=0, pub_key=0):
-        _KeyGenerator.__init__(self, keysize)
-        self.keysize = keysize
-        self.priv_key = priv_key
-        self.pub_key = pub_key
-
-    def __str__(self):
-        return "Public key: "+str(self.n)+str(self.e)+'\n'+"Private key: "+str(self.n)+str(self.d)
-
-    def __len__(self, *args):
-        for arg in args:
-            return len(str(arg))
-
-    def to_file(self, path, overwrite=False):
-
-        pub_system_path = os.path.join(path,'pub_key.dat')
-        priv_system_path = os.path.join(path,'priv_key.dat')
-
-        if not overwrite:
-            m = 'x'
-        if overwrite:
-            m = 'w'
-
-        with open(pub_system_path, m) as self.pub_key_file:
-            self.pub_key = str(self.n)+":"+str(self.e)
-            self.pub_key_file.write(self.pub_key)
-        with open(priv_system_path, m) as self.priv_key_file:
-            self.priv_key = str(self.n)+":"+str(self.d)
-            self.priv_key_file.write(self.priv_key)
 
 # ----------------------------------------------------------------------------------------------
 # Block assembler class takes raw data and transforms it into integer blocks of a fixed lenght. 
@@ -116,6 +104,9 @@ class _BlockAssembler:
     # Will throw error if data contains text outside charset
     CHARSET_DATA = string.ascii_letters+string.digits+"@#$%^&*()<>-=,.?:;[]/!\\`\'\" "
     CHARSET = []
+
+    # Every character is an index of a list instead of a string. This allows for \n \r and \t characters to be
+    # evaluated as a single index, instead of the '\' and 'n' parts both occupying its own index, which garbles decryption
     for i in CHARSET_DATA:
         CHARSET.append(i)
     CHARSET.append('\n')
@@ -126,63 +117,75 @@ class _BlockAssembler:
         self.integer_block = integer_block
         self.block_size = block_size
         self.raw_integer_block = raw_integer_block
-        self.assembled_blocks = assembled_blocks
 
-    # Checks for proper lenght of individual blocks
+    """ Checks for proper lenght of individual blocks, this can be called to evaluate whether a specific block lenght is valid
+    if we say that:
+    block lenght = L
+    key size = K
+    character set = C
+    block size = S
+    f(x) = (2^K > C^S)
+    then 
+    lim S→L f(x) → L = (S - 1)
+    """
     def __len__(self):
         if pow(2, __class__().keysize) > pow(len(__class__().CHARSET), self.block_size):
             return True
         else:
             return False
     
-    # Assemble raw block and return as string
+    # Takes original input and assembles into one long string to be processed by the _get_formatted_blocks method
     def _assemble_raw_block(self, raw_data):
         self.exp=0
         prog = bar(raw_data)
         prog.set_description("[Info] Assembling raw data")
         for i in prog:
             # For index location in character multiply by the len of the charset and an incrementing exponent
-            print(i)
             self.raw_integer_block += __class__().CHARSET.index(i) * (pow(len(__class__().CHARSET),self.exp))
             self.exp+=1 
-        # print("raw block: " + str(self.raw_integer_block))
         return str(self.raw_integer_block)
 
+    # Takes decrypted raw blocks and proccesses them into plain text
     def _disassemble_raw_blocks(self, msg_len, block_size, integer_blocks):
         prog = bar(integer_blocks)
         prog.set_description("[Info] Disassembling integer block")
         msg_len = int(msg_len)
         message = []
+
+        # Evaluate blocks
         for block in prog:
+            # List gets empied at the beginning of each iteration of the first loop
             block_message = []
             for i in range(block_size - 1, -1, -1):
+                # Using the original message lenght and block size get original character index
                 if len(message) + i < msg_len:
+                    # Character index is the block divided by the charset to the power of the block iteration
                     char_index = block // (len(__class__().CHARSET) ** i)
-                    print("char index: " + str(char_index))
                     block = block % (len(__class__().CHARSET) ** i)
+                    # Insert message into into block message list
                     block_message.insert(0, __class__().CHARSET[char_index])
+            # content of list is passed to message and block_message is reset for next iteration
             message.extend(block_message)
+        # return joined message
         return ''.join(message)
         
-
-
-    # Call __len__ to get the maximum block size
+    # Call __len__ to get the maximum block size until maximum lenght is reached
     def _get_block_size(self):
         while True:
             if self.__len__() is False:
                 return self.block_size
             self.block_size+=1
 
-    # Create generator that returns list with block_size lenght blocks
+    # Generator to cut up the raw_blocks into fixed lenght blocks according to block_size
     def _get_formatted_blocks(self, raw_data):
         self.raw_block, self.block_size = self._assemble_raw_block(raw_data), (self._get_block_size() - 1)
         return [self.raw_block[i:i + self.block_size] for i in range(0, len(self.raw_block), self.block_size)]
-
+    # Format cipher blocks into fixed lenght blocks, same as _get_formatted_blocks
     def _get_formatted_cipher_blocks(self, cipher_data, block_size):
         return (cipher_data[0+i:block_size+i] for i in range(0, len(str(cipher_data)), block_size))
 
 
-# BlockHandler holds encrypt and decrypt methods
+# Handles blocks assembled by BlockAssembler by encrypting, decrypting and outputting to files
 class BlockHandler(_BlockAssembler):
 
     def __init__(self,
@@ -190,22 +193,25 @@ class BlockHandler(_BlockAssembler):
                 block_size=0,
                 cipher_blocks=[],
                 plain_integer_blocks=[],
-                plain_text_blocks=''):
+                plain_text_blocks='',
+                raw_data=''):
         _BlockAssembler.__init__(self)
         self.raw_integer_block = raw_integer_block.__class__()
         self.block_size = block_size.__class__()
         self.cipher_blocks = cipher_blocks
         self.plain_integer_blocks = plain_integer_blocks
-        self.plain_text_blocks = plain_text_blocks
+        self.raw_data = raw_data
+
 
     @staticmethod    
     def split_key(key):
         return key.split(":")
     
+    # reads content to encrypt/decrypt
     @staticmethod
     def read_content(path):
         content = open(path, 'r')
-        stdout.write(f"[Info] Reading content {path}...")
+        stdout.write(f"[Info] Reading content {path}...\n")
         data = content.read()
         stdout.write("[Info] Done\n")
         content.close()
@@ -213,14 +219,27 @@ class BlockHandler(_BlockAssembler):
        
     def encrypt(self, raw_data, pub_key, output):
 
+        # Assign input to class property
         self.raw_data = raw_data
 
+        # Split public key into key parts
         self.pub_key = self.split_key(pub_key)
         stdout.write("[Info] Formatting blocks...")
+
+        # Get list of blocks with block_size size
         self.blocks = super()._get_formatted_blocks(str(self.raw_data))
         stdout.write("[Info] Done\n")
         prog = bar(self.blocks)
         prog.set_description("[Info] Encrypting blocks")
+
+        """ Encrypting blocks
+        Cipher block = C
+        Plain text block = M
+        Public key[0] = N
+        Public key[1] = E
+        Then:
+        C = M^E mod N
+        """
         for block in prog:
             self.cipher_block = pow(int(block), int(self.pub_key[1]), int(self.pub_key[0]))
             self.cipher_blocks.append(self.cipher_block)
@@ -228,21 +247,36 @@ class BlockHandler(_BlockAssembler):
         # print("ciph: " + str(self.cipher_blocks))
         return self.cipher_blocks
 
-    def decrypt(self, cipher_data, priv_key, output):     
+
+    def decrypt(self, cipher_data, priv_key, output): 
+
+        # Encrypted text contains information on lenght and size of original message, which is necessary for decoding    
         self.buf = cipher_data.split('|')
         self.msg_len, self.block_size, self.cipher_data = int(self.buf[0]), int(self.buf[1]), self.buf[2]
         self.cipher_data = self.cipher_data.replace(',','')
+
+        # Format cipher data into blocks that are the same size as the original message
         self.cipher_blocks = list(super()._get_formatted_cipher_blocks(self.cipher_data, self.block_size))
-        # print(self.cipher_blocks)
         self.priv_key = self.split_key(priv_key)
         prog = bar(self.cipher_blocks)
         prog.set_description("[Info] Decrypting blocks")
+
+        """
+        Cipher block = C
+        Plain text block = M
+        Private key[0] = N
+        Private key[1] = D
+        Then:
+        M = C^D mod N
+        """
         for block in prog:
             self.plain_block = pow(int(block), int(self.priv_key[1]), int(self.priv_key[0]))
             self.plain_integer_blocks.append(self.plain_block)
+        # Call dissasemble method to turn integer blocks back into plain text
         self.plain_text = super()._disassemble_raw_blocks(self.msg_len, int(self.block_size), self.plain_integer_blocks)
         return self.plain_text
 
+    # Functions to write to files below
     def to_encrypted_file(self, path, overwrite=False):
 
         file_system_path = Path(fr'{path}')
@@ -361,8 +395,8 @@ def modInverse(a, m):
 # ----------------------------------------------------------------------------------
 
 
-# Helper class creates helper objects to aid in logging and outputting text
-class Helper(_KeyGenerator):
+# Collection of static methods used to messages
+class Helper(_KeyContainer):
 
     @staticmethod
     def show_help():
@@ -395,8 +429,8 @@ class Helper(_KeyGenerator):
 
     Examples:
     pkc.py gen -l 2048 -o /home/user
-    pkc.py en --privkey /root/pk_priv.dat -f myfile.txt
-    pkc.py de -f myfile.txt --pubkey /home/user/pk_pub.dat\n''')
+    pkc.py en --publickey /root/pub_key.dat -f myfile.txt
+    pkc.py de -f my_encrypted_file.txt --privatekey /home/user/priv_key.dat\n''')
 
     @staticmethod
     def measure_time(t1, t2):
@@ -417,17 +451,17 @@ handler = BlockHandler()
 # Key generation
 def gen(keysize=1024):
     metric_start = prog()
-    keys = KeyContainer(namespace.keysize)
-    keys.generate()
+    generator = KeyGenerator(namespace.keysize)
+    generator.generate()
     try:
-        if namespace.force and not namespace.print:
-            keys.to_file(namespace.output, overwrite=True)
+
+        if namespace.output and namespace.force:
+            generator.to_file(namespace.output, overwrite=True)
             stdout.write("[Info] Wrote file to path {}\n".format(namespace.output))
-        elif namespace.print and (not namespace.force and namespace.output):
-            stdout.write("[Info] Printing key..."+'\n')
-            stdout.write(keys.__str__()+'\n')
-        elif not namespace.force:
-            keys.to_file(namespace.output)
+        elif namespace.print and (not namespace.force and not namespace.output):
+            stdout.write("[Info] Printing keys..."+generator.__str__()+'\n')
+        elif namespace.output and not namespace.force:
+            generator.to_file(namespace.output)
             stdout.write("[Info] Wrote file to path {}\n".format(namespace.output))
         else:
             raise Exception("[Err] Generation failed, invalid parameters. Enter 'help' for usage.\n")
@@ -444,42 +478,43 @@ def gen(keysize=1024):
 
 # Encrypt provided file      
 def en():
-    # try:
-    metric_start = prog()
-    key = handler.read_content(namespace.pub_key)
-    raw_data = handler.read_content(namespace.input)
-    handler.encrypt(raw_data, key, namespace.output)
-    handler.to_encrypted_file(namespace.output)
+    try:
 
-    # except FileExistsError as file_exists_except:
-    #     stderr.write(str(file_exists_except)+'\n')
-    # except TypeError as type_except:
-    #     stderr.write(str(type_except)+'\n')
-    # except Exception as e:
-    #     stderr.write(str(e)+'\n')
-    # finally:
-    #     metric_stop = prog()
-    #     Helper.measure_time(metric_start, metric_stop)
+        metric_start = prog()
+        key = handler.read_content(namespace.pub_key)
+        raw_data = handler.read_content(namespace.input)
+        handler.encrypt(raw_data, key, namespace.output)
+        handler.to_encrypted_file(namespace.output)
+
+    except FileExistsError as file_exists_except:
+        stderr.write(str(file_exists_except)+'\n')
+    except TypeError as type_except:
+        stderr.write(str(type_except)+'\n')
+    except Exception as e:
+        stderr.write(str(e)+'\n')
+    finally:
+        metric_stop = prog()
+        Helper.measure_time(metric_start, metric_stop)
 
 
 def de():
-    # try:
-    metric_start = prog()
-    cipher_data = handler.read_content(namespace.input)
-    key = handler.read_content(namespace.priv_key)
-    plain_text = handler.decrypt(cipher_data, key, namespace.output)
-    handler.to_plain_text_file(namespace.output, plain_text)
+    try:
 
-    metric_stop = prog()
+        metric_start = prog()
+        cipher_data = handler.read_content(namespace.input)
+        key = handler.read_content(namespace.priv_key)
+        plain_text = handler.decrypt(cipher_data, key, namespace.output)
+        handler.to_plain_text_file(namespace.output, plain_text)
 
-    # except FileExistsError as file_exists_except:
-    #     stderr.write(str(file_exists_except)+'\n')
-    # except TypeError as type_except:
-    #     stderr.write(str(type_except)+'\n')
-    # except Exception as e:
-    #     stderr.write(str(e)+'\n')
-    # finally:
-    #     Helper.measure_time(metric_start, metric_stop)
+    except FileExistsError as file_exists_except:
+        stderr.write(str(file_exists_except)+'\n')
+    except TypeError as type_except:
+        stderr.write(str(type_except)+'\n')
+    except Exception as e:
+        stderr.write(str(e)+'\n')
+    finally:
+        metric_stop = prog()
+        Helper.measure_time(metric_start, metric_stop)
 
 
 INIT = {
