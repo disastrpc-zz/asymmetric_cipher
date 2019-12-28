@@ -2,12 +2,12 @@
 # Python Implementation of a Public Key Cipher 
 # Jared @ github.com/disastrpc
 
-__author__ = 'Jared'
+__author__ = 'disastrpc'
 __license__ = 'GNU GPL'
 
 import argparse, string, os, math, re
 from sys import path, stderr, stdout
-from numpy import array
+from numpy import array, log10
 from time import perf_counter as prog
 from time import sleep
 from logging import log
@@ -50,10 +50,10 @@ class _KeyContainer:
             m = 'w'
 
         with open(pub_system_path, m) as self.pub_key_file:
-            self.pub_key = str(self.n)+":"+str(self.e)
+            self.pub_key = str(self.keysize)+"::"+str(self.n)+"::"+str(self.e)
             self.pub_key_file.write(self.pub_key)
         with open(priv_system_path, m) as self.priv_key_file:
-            self.priv_key = str(self.n)+":"+str(self.d)
+            self.priv_key = str(self.keysize)+"::"+str(self.n)+"::"+str(self.d)
             self.priv_key_file.write(self.priv_key)
 
 # KeyGenerator stores and formats private and public keys
@@ -102,19 +102,18 @@ class KeyGenerator(_KeyContainer):
 class _BlockAssembler:
 
     # Will throw error if data contains text outside charset
-    CHARSET_DATA = string.ascii_letters+string.digits+"@#$%^&*()<>-=,.?:;[]/!\\`\'\" "
-    CHARSET = []
+    CHARSET = string.ascii_letters+string.digits+"@#$%^&*()<>-=,.?:;[]/!\\`\'\" "
+
+    # CHARSET = []
 
     # Every character is an index of a list instead of a string. This allows for \n \r and \t characters to be
     # evaluated as a single index, instead of the '\' and 'n' parts both occupying its own index, which garbles decryption
-    for i in CHARSET_DATA:
-        CHARSET.append(i)
-    CHARSET.append('\n')
-    CHARSET.append('\r')
+    # for i in CHARSET_DATA:
+    #     CHARSET.append(i)
+    # CHARSET.append('\n')
+    # CHARSET.append('\r')
 
-    def __init__(self, keysize=1024, integer_block=0, block_size=0, raw_integer_block=0, assembled_blocks=0):
-        self.keysize = keysize
-        self.integer_block = integer_block
+    def __init__(self, block_size=0, raw_integer_block=0):
         self.block_size = block_size
         self.raw_integer_block = raw_integer_block
 
@@ -128,22 +127,20 @@ class _BlockAssembler:
     then 
     lim S→L f(x) → L = (S - 1)
     """
-    def __len__(self):
-        if pow(2, __class__().keysize) > pow(len(__class__().CHARSET), self.block_size):
-            return True
-        else:
-            return False
-    
+
     # Takes original input and assembles into one long string to be processed by the _get_formatted_blocks method
-    def _assemble_raw_block(self, raw_data):
-        self.exp=0
-        prog = bar(raw_data)
+    def _assemble_raw_blocks(self, raw_bytes):
+        # raw_bytes = raw_bytes.strip()
+        prog = bar(raw_bytes)
         prog.set_description("[Info] Assembling raw data")
-        for i in prog:
-            # For index location in character multiply by the len of the charset and an incrementing exponent
-            self.raw_integer_block += __class__().CHARSET.index(i) * (pow(len(__class__().CHARSET),self.exp))
-            self.exp+=1 
-        return str(self.raw_integer_block)
+        self.integer_blocks = []
+        for init_block in range(0, len(raw_bytes), self.block_size):
+            self.integer_block = 0
+            for i in range(init_block, min(init_block + self.block_size, len(raw_bytes))):
+                # For index location in character multiply by the len of the charset and an incrementing exponent
+                self.integer_block += raw_bytes[i] * (256 ** (i % self.block_size))
+            self.integer_blocks.append(self.integer_block)
+            return self.integer_blocks
 
     # Takes decrypted raw blocks and proccesses them into plain text
     def _disassemble_raw_blocks(self, msg_len, block_size, integer_blocks):
@@ -160,29 +157,33 @@ class _BlockAssembler:
                 # Using the original message lenght and block size get original character index
                 if len(message) + i < msg_len:
                     # Character index is the block divided by the charset to the power of the block iteration
-                    char_index = block // (len(__class__().CHARSET) ** i)
-                    block = block % (len(__class__().CHARSET) ** i)
+                    char_index = block // (len(_BlockAssembler.CHARSET) ** i)
+                    block = block % (len(_BlockAssembler.CHARSET) ** i)
                     # Insert message into into block message list
-                    block_message.insert(0, __class__().CHARSET[char_index])
+                    block_message.insert(0, _BlockAssembler.CHARSET[char_index])
             # content of list is passed to message and block_message is reset for next iteration
             message.extend(block_message)
         # return joined message
         return ''.join(message)
-        
-    # Call __len__ to get the maximum block size until maximum lenght is reached
-    def _get_block_size(self):
-        while True:
-            if self.__len__() is False:
-                return self.block_size
-            self.block_size+=1
+
+    # def _get_block_size(self, keysize):
+    #     self.block_size = int(math.log(2 ** keysize, len(_BlockAssembler.CHARSET)))
+    #     if not(math.log(2 ** keysize, len(_BlockAssembler.CHARSET)) >= self.block_size):
+    #         stdout.write("[Error] Invalid key for block size")
+    #     else:
+    #         return self.block_size
 
     # Generator to cut up the raw_blocks into fixed lenght blocks according to block_size
-    def _get_formatted_blocks(self, raw_data):
-        self.raw_block, self.block_size = self._assemble_raw_block(raw_data), (self._get_block_size() - 1)
-        return [self.raw_block[i:i + self.block_size] for i in range(0, len(self.raw_block), self.block_size)]
+    # def _get_formatted_blocks(self, raw_data, keysize):
+    #     print(f"keysize: {keysize}")
+    #     self.block_size = self._get_block_size(keysize)
+    #     print(f"blocksize: {self.block_size}")
+    #     self.raw_block, self.block_size = self._assemble_raw_block(raw_data), (self.block_size)
+    #     return [self.raw_block[i:i + self.block_size] for i in range(0, len(self.raw_block), self.block_size)]
+    
     # Format cipher blocks into fixed lenght blocks, same as _get_formatted_blocks
     def _get_formatted_cipher_blocks(self, cipher_data, block_size):
-        return (cipher_data[0+i:block_size+i] for i in range(0, len(str(cipher_data)), block_size))
+        return [cipher_data[i:i + block_size] for i in range(0, len(str(cipher_data)), block_size)]
 
 
 # Handles blocks assembled by BlockAssembler by encrypting, decrypting and outputting to files
@@ -205,7 +206,7 @@ class BlockHandler(_BlockAssembler):
 
     @staticmethod    
     def split_key(key):
-        return key.split(":")
+        return key.split("::")
     
     # reads content to encrypt/decrypt
     @staticmethod
@@ -213,45 +214,43 @@ class BlockHandler(_BlockAssembler):
         content = open(path, 'r')
         stdout.write(f"[Info] Reading content {path}...\n")
         data = content.read()
-        stdout.write("[Info] Done\n")
         content.close()
         return data
        
-    def encrypt(self, raw_data, pub_key, output):
+    def encrypt(self, raw_data, pub_key, output, block_size=0):
 
-        # Assign input to class property
-        self.raw_data = raw_data
+        if block_size == 0:
+            self.block_size = 128
+        else:
+            self.block_size = block_size
 
+        self.raw_bytes = raw_data.encode('ascii')
         # Split public key into key parts
         self.pub_key = self.split_key(pub_key)
-        stdout.write("[Info] Formatting blocks...")
+        stdout.write("[Info] Formatting blocks...\n")
 
         # Get list of blocks with block_size size
-        self.blocks = super()._get_formatted_blocks(str(self.raw_data))
-        stdout.write("[Info] Done\n")
-        prog = bar(self.blocks)
-        prog.set_description("[Info] Encrypting blocks")
+        # self.block_size = self._get_block_size(int(self.pub_key[0]))
 
         """ Encrypting blocks
         Cipher block = C
         Plain text block = M
-        Public key[0] = N
-        Public key[1] = E
+        Public key[1] = N
+        Public key[2] = E
         Then:
         C = M^E mod N
         """
-        for block in prog:
-            self.cipher_block = pow(int(block), int(self.pub_key[1]), int(self.pub_key[0]))
+        for block in super()._assemble_raw_blocks(self.raw_bytes):
+            self.cipher_block = pow(int(block), int(self.pub_key[2]), int(self.pub_key[1]))
             self.cipher_blocks.append(self.cipher_block)
-        stdout.write("[Info] Done\n")
         # print("ciph: " + str(self.cipher_blocks))
         return self.cipher_blocks
 
 
     def decrypt(self, cipher_data, priv_key, output): 
-
+        
         # Encrypted text contains information on lenght and size of original message, which is necessary for decoding    
-        self.buf = cipher_data.split('|')
+        self.buf = cipher_data.split('::')
         self.msg_len, self.block_size, self.cipher_data = int(self.buf[0]), int(self.buf[1]), self.buf[2]
         self.cipher_data = self.cipher_data.replace(',','')
 
@@ -287,9 +286,10 @@ class BlockHandler(_BlockAssembler):
             m = 'w'
         
         with open(file_system_path, m) as self.cipher_file:
+            print(self.cipher_blocks)
             self.string_cipher_blocks = ','.join(str(i) for i in self.cipher_blocks)
             # self.string_cipher_blocks = re.sub(',','', self.string_cipher_blocks)
-            self.cipher_file.write("{}|{}|{}".format(len(self.raw_data), self.block_size, self.string_cipher_blocks))
+            self.cipher_file.write("{}::{}::{}".format(len(self.raw_bytes) - 1, self.block_size, self.string_cipher_blocks))
 
     def to_plain_text_file(self, path, data):
         file_system_path = Path(fr'{path}')
@@ -449,7 +449,7 @@ class Helper(_KeyContainer):
 # These are called by the parser object whenever certain args are provided
 handler = BlockHandler()
 # Key generation
-def gen(keysize=1024):
+def gen(keysize=64):
     metric_start = prog()
     generator = KeyGenerator(namespace.keysize)
     generator.generate()
@@ -478,23 +478,23 @@ def gen(keysize=1024):
 
 # Encrypt provided file      
 def en():
-    try:
+    # try:
 
-        metric_start = prog()
-        key = handler.read_content(namespace.pub_key)
-        raw_data = handler.read_content(namespace.input)
-        handler.encrypt(raw_data, key, namespace.output)
-        handler.to_encrypted_file(namespace.output)
+    metric_start = prog()
+    key = handler.read_content(namespace.pub_key)
+    raw_data = handler.read_content(namespace.input)
+    handler.encrypt(raw_data, key, namespace.output, block_size=128)
+    handler.to_encrypted_file(namespace.output)
 
-    except FileExistsError as file_exists_except:
-        stderr.write(str(file_exists_except)+'\n')
-    except TypeError as type_except:
-        stderr.write(str(type_except)+'\n')
-    except Exception as e:
-        stderr.write(str(e)+'\n')
-    finally:
-        metric_stop = prog()
-        Helper.measure_time(metric_start, metric_stop)
+    # except FileExistsError as file_exists_except:
+    #     stderr.write(str(file_exists_except)+'\n')
+    # except TypeError as type_except:
+    #     stderr.write(str(type_except)+'\n')
+    # except Exception as e:
+    #     stderr.write(str(e)+'\n')
+    # finally:
+    metric_stop = prog()
+    Helper.measure_time(metric_start, metric_stop)
 
 
 def de():
@@ -531,7 +531,7 @@ parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument(dest='mode',choices=INIT.keys())
 
 # gen mode
-parser.add_argument('-l','--lenght',default=1024,type=int,dest='keysize')
+parser.add_argument('-l','--lenght',default=64,type=int,dest='keysize')
 parser.add_argument('-o','--output',dest='output')
 parser.add_argument('--force',action='store_true',dest='force')
 parser.add_argument('--print',action='store_true',dest='print')
