@@ -7,17 +7,13 @@ __license__ = 'GNU GPL'
 
 import argparse, string, os, math, re
 from sys import path, stderr, stdout
-from numpy import array, log10
+from numpy import array
 from time import perf_counter as prog
 from time import sleep
-from logging import log
-from threading import Thread
 from tqdm import tqdm as bar
 from random import randrange, random
 from pathlib import Path
 from numbers import Integral
-from itertools import cycle
-from ctypes import pythonapi, py_object
 
 # Key container class holds all parts of the key pairs, as well as keysize
 class _KeyContainer:
