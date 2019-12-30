@@ -1,8 +1,10 @@
 # Public Key Cipher
 ## Python Implementation by Jared Freed
 
-This is a basic implementation of an asymmetric cipher, able to generate keys of a provided lenght, encrypt and 
+This is a basic implementation of an asymmetric cipher, able to generate keys of a provided lenght, as well as encrypt and 
 decrypt messages. 
+
+Note: While it is mathematically impossible to derive any of the keys without the other, the nature of pseudo-random number generation makes this unsafe for real world applications. 
 
 ## Key generator     
 ```
@@ -33,6 +35,3 @@ python pkc.py en --publickey /root/pub_key.dat -f myfile.txt -o /home/user/Docum
 python pkc.py de -f my_encrypted_file --privatekey priv_key.dat --output 
 /home/user/Documents/my_decrypted_file.txt
 ``` 
-
-Keys will be created to the specified directory with the default name pub_key.dat and priv_key.dat at the 
-specified directory.
