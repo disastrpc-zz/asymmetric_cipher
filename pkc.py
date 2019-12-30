@@ -90,10 +90,8 @@ class KeyGenerator(_KeyContainer):
 
     # Calls to all _comp methods to generate key pairs
     def generate(self):
-        self.n = self._comp_n()
-        self.e = self._comp_e()
-        self.d = self._comp_d()
-        return self.n, self.e, self.d
+        stdout.write(f"[Info] Generating keys {self.keysize} bytes long\n")
+        return self._comp_n(), self._comp_e(), self._comp_d()
 
 # Block assembler class takes raw data and transforms it into integer blocks of a fixed lenght. 
 class _BlockAssembler:
@@ -107,19 +105,20 @@ class _BlockAssembler:
         # prog = bar(raw_bytes)
         # prog.set_description("[Info] Assembling raw data")
         self.integer_blocks = []
-
         # convert message to a bytes() object
         self.raw_bytes = raw_data.encode('ascii')
 
         # init_block declares the index start of the block, up until the block size
         for init_block in range(0, len(self.raw_bytes), self.block_size):
             self.integer_block = 0
+
             # creates blocks that are block_size in lenght or the lenght of the message
             for i in range(init_block, min(init_block + self.block_size, len(self.raw_bytes))):
                 # get ascii code for the character at i index
                 self.integer_block += self.raw_bytes[i] * (256 ** (i % self.block_size))
             # code gets converted into a block and appended to the list of blocks
             self.integer_blocks.append(self.integer_block)
+
         return self.integer_blocks
 
     # Takes decrypted raw blocks and proccesses them into plain text
@@ -168,7 +167,7 @@ class BlockHandler(_BlockAssembler):
         self.pub_key = self.split_key(pub_key)
         stdout.write("[Info] Formatting blocks...\n")
         if int(self.pub_key[0]) < 1024:
-            stdout.write("[Error] Minimum keysize supported is 1024")
+            stdout.write("[Error] Minimum keysize supported is 1024\n")
             exit()
 
         """ Encrypting blocks
@@ -180,8 +179,11 @@ class BlockHandler(_BlockAssembler):
         C = M^E mod N
         """
         self.cipher_blocks = []
+        pbar = bar(desc="[Info] Encrypting")
         for block in super()._assemble_raw_blocks(raw_data):
+            pbar.update(1)
             self.cipher_blocks.append(pow(int(block), int(self.pub_key[2]), int(self.pub_key[1])))
+        pbar.close()
         return self.cipher_blocks
 
 
@@ -193,6 +195,7 @@ class BlockHandler(_BlockAssembler):
         self.priv_key = self.split_key(priv_key)
 
         self.integer_blocks = []
+        pbar = bar(desc="[Info] Decrypting")
         for block in self.cipher_blocks:  
             """
             Cipher block = C
@@ -202,8 +205,10 @@ class BlockHandler(_BlockAssembler):
             Then:
             M = C^D mod N
             """
+            pbar.update(1)
             plain_block = pow(int(block), int(self.priv_key[2]), int(self.priv_key[1]))
             self.integer_blocks.append(plain_block)
+        pbar.close()
         # Call dissasemble method to turn integer blocks back into plain text
         return super()._disassemble_blocks(self.msg_len, self.block_size, self.integer_blocks)
 
@@ -293,10 +298,13 @@ def isPrime(n):
 # generated number will be s bits in size
 # s must be supplied
 def genPrime(s):
+    pbar = bar(desc="[Info] Generating prime pair")
     while True:
+        pbar.update(1)
         # generate random number in range of 2^keysize -1 and 2^keysize
         n = randrange(2**(s-1), 2**(s))
         if isPrime(n):
+            pbar.close()
             return n
 
 # return true if n is prime using trial division algorithm
