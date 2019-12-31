@@ -1,5 +1,5 @@
-# Public Key Cipher
-## Python Implementation by Jared Freed
+# RSA Asymmetric Cipher
+## Python Implementation
 
 This is a basic implementation of an asymmetric cipher, able to generate keys of a provided lenght, as well as encrypt and 
 decrypt messages. 
