@@ -7,7 +7,6 @@ __license__ = 'GNU GPL'
 
 import argparse, string, os, math, re
 from sys import path, stderr, stdout
-from numpy import array
 from time import perf_counter as prog
 from time import sleep
 from tqdm import tqdm as bar
