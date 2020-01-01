@@ -92,7 +92,7 @@ class KeyGenerator(_KeyContainer):
         stdout.write(f"[Info] Generating keys {self.keysize} bytes long\n")
         return self._comp_n(), self._comp_e(), self._comp_d()
 
-# Block assembler class takes raw data and transforms it into integer blocks of a fixed lenght. 
+# Block assembler class takes the message and transforms it into integer blocks of a fixed lenght. 
 class _BlockAssembler:
 
     def __init__(self, block_size=0, raw_integer_block=0):
@@ -193,17 +193,17 @@ class BlockHandler(_BlockAssembler):
         self.msg_len, self.block_size, self.cipher_blocks = int(self.buf[0]), int(self.buf[1]), self.buf[2].split(',')
         self.priv_key = self.split_key(priv_key)
 
+        """
+        Cipher block = C
+        Plain text block = M
+        Private key[0] = N
+        Private key[1] = D
+        Then:
+        M = C^D mod N
+        """
         self.integer_blocks = []
         pbar = bar(desc="[Info] Decrypting")
         for block in self.cipher_blocks:  
-            """
-            Cipher block = C
-            Plain text block = M
-            Private key[0] = N
-            Private key[1] = D
-            Then:
-            M = C^D mod N
-            """
             pbar.update(1)
             plain_block = pow(int(block), int(self.priv_key[2]), int(self.priv_key[1]))
             self.integer_blocks.append(plain_block)
