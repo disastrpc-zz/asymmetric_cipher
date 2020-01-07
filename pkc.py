@@ -61,10 +61,7 @@ class KeyGenerator(_KeyContainer):
             keysize = 1024
 
         _KeyContainer.__init__(self, keysize)
-
-    def __len__(self, *args):
-        for arg in args:
-            return len(str(arg))
+        
     # compute n
     def _comp_n(self):
         self.n = self.p * self.q
